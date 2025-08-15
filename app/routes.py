@@ -1,5 +1,9 @@
 from flask import Blueprint, jsonify, render_template
 from .models import Transaction
+import logging
+
+# Logger para este módulo
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('main', __name__)
 

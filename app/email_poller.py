@@ -1,13 +1,18 @@
 import imaplib
 import email
+import email.utils
 from email.header import decode_header
 import time
+import re
 from datetime import datetime, timezone
 from .config import Config
 from .database import DatabaseManager
 from .llm import parse_email
 from .telegram_bot import notify_new_transaction
-from flask import current_app
+import logging
+
+# Logger para este módulo
+logger = logging.getLogger(__name__)
 
 
 class EmailProcessor:
@@ -158,6 +163,7 @@ class EmailProcessor:
         
         # Filtro por fecha
         cutoff = self._ensure_utc(self.account.last_checked)
+        logger.debug('Fecha de corte para búsqueda IMAP: %s', cutoff)
         if cutoff:
             date_str = cutoff.strftime("%d-%b-%Y")
             search_parts.extend(["SINCE", date_str])
@@ -222,7 +228,7 @@ class EmailProcessor:
     
     def process_emails(self):
         """Procesa todos los emails nuevos de la cuenta"""
-        current_app.logger.debug('Procesando cuenta %s (last_checked=%s)', 
+        logger.debug('Procesando cuenta %s (last_checked=%s)', 
                                 self.account.id, self.account.last_checked)
         
         conn = imaplib.IMAP4_SSL(self.account.imap_host, Config.IMAP_PORT)
@@ -235,15 +241,15 @@ class EmailProcessor:
             
             # Buscar emails
             criteria = self._build_imap_search()
-            current_app.logger.debug('Búsqueda IMAP: %s', criteria)
+            logger.debug('Búsqueda IMAP: %s', criteria)
             
             status, data = conn.search(None, criteria)
             if status != 'OK':
-                current_app.logger.error('Falló búsqueda IMAP para cuenta %s', self.account.id)
+                logger.error('Falló búsqueda IMAP para cuenta %s', self.account.id)
                 return []
             
             email_ids = data[0].split()
-            current_app.logger.debug('Encontrados %d emails', len(email_ids))
+            logger.debug('Encontrados %d emails', len(email_ids))
             
             for email_id in email_ids:
                 try:
@@ -254,7 +260,7 @@ class EmailProcessor:
                             if max_date_seen is None or email_data['email_date'] > max_date_seen:
                                 max_date_seen = email_data['email_date']
                 except Exception as e:
-                    current_app.logger.error('Error procesando email %s: %s', email_id, e)
+                    logger.error('Error procesando email %s: %s', email_id, e)
             
             # Actualizar fecha de última revisión
             if max_date_seen:
@@ -284,7 +290,7 @@ class EmailProcessor:
         # Verificar duplicados
         msg_id = msg.get('Message-ID') or f"{self.account.id}:{email_id.decode()}"
         if DatabaseManager.is_duplicate_transaction(msg_id):
-            current_app.logger.debug('Email duplicado: %s', msg_id)
+            logger.debug('Email duplicado: %s', msg_id)
             return None
         
         # Parsear con LLM
@@ -292,13 +298,13 @@ class EmailProcessor:
         body = self._get_email_body(msg)
 
         if self.is_subject_supported(subject):
-            current_app.logger.debug('Procesando email con asunto: %s', subject)
-            current_app.logger.debug('Body extraído (primeros 500 chars): %s', body[:500])
+            logger.debug('Procesando email con asunto: %s', subject)
+            logger.debug('Body extraído (primeros 500 chars): %s', body[:500])
             parsed_data = parse_email(subject, body)
-            current_app.logger.debug('Datos parseados: %s', parsed_data)
+            logger.debug('Datos parseados: %s', parsed_data)
             return self._create_email_data(msg, parsed_data)
         else:
-            current_app.logger.debug('Asunto no soportado: %s', subject)
+            logger.debug('Asunto no soportado: %s', subject)
             return None
 
 
@@ -307,7 +313,7 @@ def poll_once(app):
     with app.app_context():
         accounts = DatabaseManager.get_enabled_accounts()
         if not accounts:
-            current_app.logger.warning('No hay cuentas habilitadas')
+            logger.warning('No hay cuentas habilitadas')
             return []
         
         all_new_transactions = []
@@ -321,7 +327,7 @@ def poll_once(app):
                     # Obtener usuario para notificación
                     user = DatabaseManager.get_user_for_account(account)
                     if not user:
-                        current_app.logger.warning('Cuenta %s sin usuarios', account.id)
+                        logger.warning('Cuenta %s sin usuarios', account.id)
                         continue
                     
                     # Crear transacción pendiente
@@ -331,28 +337,25 @@ def poll_once(app):
                     # Notificar por Telegram para que el usuario describa la transacción
                     notify_new_transaction(app, tx)
                 
-                current_app.logger.info('Cuenta %s: %d nuevas transacciones', 
+                logger.info('Cuenta %s: %d nuevas transacciones', 
                                       account.id, len(new_emails))
                 
             except Exception as e:
-                current_app.logger.exception('Error procesando cuenta %s: %s', account.id, e)
+                logger.exception('Error procesando cuenta %s: %s', account.id, e)
         
         return all_new_transactions
 
 
 def run_poller(app):
     """Loop principal del poller"""
-    with app.app_context():
-        app.logger.info('Iniciando email poller (intervalo %ss)', Config.POLL_INTERVAL)
+    logger.info('Iniciando email poller (intervalo %ss)', Config.POLL_INTERVAL)
     
     while True:
         try:
             new_transactions = poll_once(app)
             if new_transactions:
-                with app.app_context():
-                    current_app.logger.info('Total nuevas transacciones: %d', len(new_transactions))
+                logger.info('Total nuevas transacciones: %d', len(new_transactions))
             time.sleep(Config.POLL_INTERVAL)
         except Exception as e:
-            with app.app_context():
-                current_app.logger.exception('Error en poller: %s', e)
+            logger.exception('Error en poller: %s', e)
             time.sleep(Config.POLL_INTERVAL)

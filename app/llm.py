@@ -1,6 +1,10 @@
 import os
 import json
 import requests
+import logging
+
+# Logger para este módulo
+logger = logging.getLogger(__name__)
 
 SYSTEM_PARSE = ("Eres un asistente que extrae campos estructurados de correos bancarios chilenos. "
                 "Devuelve JSON estricto con: tipo_transaccion (debito|credito|transferencia|desconocido), "
