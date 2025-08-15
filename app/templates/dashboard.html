@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Dashboard Finanzas</title>
+  <style>
+    body { font-family: system-ui, Arial; margin: 1rem; background:#f5f7fa; }
+    h1 { font-size: 1.4rem; }
+    table { border-collapse: collapse; width:100%; background:white; }
+    th, td { border:1px solid #ddd; padding:6px; font-size:0.85rem; }
+    th { background:#222; color:white; position:sticky; top:0; }
+    .amount.neg { color:#c0392b; }
+    .amount.pos { color:#27ae60; }
+    .pill { padding:2px 6px; border-radius:12px; background:#eee; font-size:0.7rem; }
+    #filters { margin:0 0 1rem; display:flex; gap:1rem; flex-wrap:wrap; }
+    footer { margin-top:2rem; font-size:0.7rem; color:#666; }
+  </style>
+</head>
+<body>
+<h1>Gastos personales</h1>
+<div id="filters">
+  <label>Buscar <input id="q" /></label>
+  <label>Tipo
+    <select id="type">
+      <option value="">Todos</option>
+      <option value="debito">Débito</option>
+      <option value="credito">Crédito</option>
+      <option value="transferencia">Transferencia</option>
+    </select>
+  </label>
+  <label>Categoría <input id="cat" /></label>
+</div>
+<table id="tbl">
+  <thead><tr><th>Fecha</th><th>Monto</th><th>Comercio</th><th>Tipo</th><th>Categoría</th><th>Descripción</th></tr></thead>
+  <tbody></tbody>
+</table>
+<footer>Actualiza cada 30s automáticamente</footer>
+<script>
+async function load(){
+  const r = await fetch('/api/transactions');
+  const data = await r.json();
+  render(data);
+}
+function render(data){
+  const q = document.getElementById('q').value.toLowerCase();
+  const type = document.getElementById('type').value;
+  const cat = document.getElementById('cat').value.toLowerCase();
+  const body = document.querySelector('#tbl tbody');
+  body.innerHTML='';
+  data.filter(t => (!q || JSON.stringify(t).toLowerCase().includes(q)) && (!type || t.type===type) && (!cat || (t.category||'').toLowerCase().includes(cat)))
+    .forEach(t => {
+      const tr=document.createElement('tr');
+      const amtCls = t.amount < 0 ? 'neg':'pos';
+      tr.innerHTML = `<td>${new Date(t.date).toLocaleString()}</td><td class="amount ${amtCls}">${t.amount.toFixed(2)}</td><td>${t.merchant||''}</td><td><span class="pill">${t.type||''}</span></td><td>${t.category||''}</td><td>${t.description||''}</td>`;
+      body.appendChild(tr);
+    });
+}
+['q','type','cat'].forEach(id=>document.getElementById(id).addEventListener('input', load));
+load();
+setInterval(load, 30000);
+</script>
+</body>
+</html>
