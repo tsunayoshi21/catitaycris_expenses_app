@@ -1,63 +1,186 @@
-<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8" />
-  <title>Dashboard Finanzas</title>
+{% extends 'base.html' %}
+{% block title %}Dashboard - Finanzas{% endblock %}
+
+{% block head %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
-    body { font-family: system-ui, Arial; margin: 1rem; background:#f5f7fa; }
-    h1 { font-size: 1.4rem; }
-    table { border-collapse: collapse; width:100%; background:white; }
-    th, td { border:1px solid #ddd; padding:6px; font-size:0.85rem; }
-    th { background:#222; color:white; position:sticky; top:0; }
-    .amount.neg { color:#c0392b; }
-    .amount.pos { color:#27ae60; }
-    .pill { padding:2px 6px; border-radius:12px; background:#eee; font-size:0.7rem; }
-    #filters { margin:0 0 1rem; display:flex; gap:1rem; flex-wrap:wrap; }
-    footer { margin-top:2rem; font-size:0.7rem; color:#666; }
+    /* Igualar tamaño/altura de gráficos y mejorar estética */
+    .chart-container { position: relative; height: 360px; }
+    @media (min-width: 1400px){ .chart-container { height: 420px; } }
   </style>
-</head>
-<body>
-<h1>Gastos personales</h1>
-<div id="filters">
-  <label>Buscar <input id="q" /></label>
-  <label>Tipo
-    <select id="type">
-      <option value="">Todos</option>
-      <option value="debito">Débito</option>
-      <option value="credito">Crédito</option>
-      <option value="transferencia">Transferencia</option>
-    </select>
-  </label>
-  <label>Categoría <input id="cat" /></label>
-</div>
-<table id="tbl">
-  <thead><tr><th>Fecha</th><th>Monto</th><th>Comercio</th><th>Tipo</th><th>Categoría</th><th>Descripción</th></tr></thead>
-  <tbody></tbody>
-</table>
-<footer>Actualiza cada 30s automáticamente</footer>
+{% endblock %}
+
+{% block content %}
+  <div class="row g-3 align-items-end mb-3">
+    <div class="col-6 col-md-2">
+      <label class="form-label">Año</label>
+      <input id="year" type="number" class="form-control" placeholder="YYYY">
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label">Mes</label>
+      <input id="month" type="number" class="form-control" placeholder="1-12">
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label">Semana ISO</label>
+      <input id="week" type="number" class="form-control" placeholder="1-53">
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label">Día</label>
+      <input id="day" type="date" class="form-control">
+    </div>
+    <div class="col-6 col-md-1">
+      <label class="form-label">Tipo</label>
+      <select id="type" class="form-select">
+        <option value="">Todos</option>
+        <option value="debito">Débito</option>
+        <option value="credito">Crédito</option>
+        <option value="transferencia">Transferencia</option>
+      </select>
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label">Categoría</label>
+      <input id="category" class="form-control" placeholder="todas">
+    </div>
+    <div class="col-12 col-md-3">
+      <label class="form-label">Buscar</label>
+      <input id="q" class="form-control" placeholder="texto libre">
+    </div>
+    <div class="col-12 col-md-2 ms-auto">
+      <button id="resetFilters" class="btn btn-secondary w-100">Reset filtros</button>
+    </div>
+  </div>
+
+  <!-- Resumen -->
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-md-4 offset-md-4">
+      <div class="card shadow-sm">
+        <div class="card-body text-center">
+          <h5 class="card-title">Gasto total</h5>
+          <div id="total" class="display-6">$0</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gráficos alineados y del mismo tamaño -->
+  <div class="row g-3 mb-4 align-items-stretch">
+    <div class="col-12 col-xl-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h5 class="card-title">Gasto por categoría (barras)</h5>
+          <div class="chart-container">
+            <canvas id="catChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-xl-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h5 class="card-title">Distribución por categoría (torta)</h5>
+          <div class="chart-container">
+            <canvas id="pieChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leyenda a ancho completo -->
+  <div class="row g-3 mb-4">
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Leyenda</h5>
+          <div id="legend" class="d-flex flex-column gap-2"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
 <script>
-async function load(){
-  const r = await fetch('/api/transactions');
-  const data = await r.json();
-  render(data);
+function hashString(s){
+  let h = 0; for(let i=0;i<s.length;i++){ h = ((h<<5)-h) + s.charCodeAt(i); h|=0; }
+  return h;
 }
-function render(data){
-  const q = document.getElementById('q').value.toLowerCase();
-  const type = document.getElementById('type').value;
-  const cat = document.getElementById('cat').value.toLowerCase();
-  const body = document.querySelector('#tbl tbody');
-  body.innerHTML='';
-  data.filter(t => (!q || JSON.stringify(t).toLowerCase().includes(q)) && (!type || t.type===type) && (!cat || (t.category||'').toLowerCase().includes(cat)))
-    .forEach(t => {
-      const tr=document.createElement('tr');
-      const amtCls = t.amount < 0 ? 'neg':'pos';
-      tr.innerHTML = `<td>${new Date(t.date).toLocaleString()}</td><td class="amount ${amtCls}">${t.amount.toFixed(2)}</td><td>${t.merchant||''}</td><td><span class="pill">${t.type||''}</span></td><td>${t.category||''}</td><td>${t.description||''}</td>`;
-      body.appendChild(tr);
-    });
+function colorForCategory(cat){
+  const hue = Math.abs(hashString(cat)) % 360;
+  return `hsl(${hue} 70% 55%)`;
 }
-['q','type','cat'].forEach(id=>document.getElementById(id).addEventListener('input', load));
-load();
-setInterval(load, 30000);
+async function fetchTx(){
+  const p = new URLSearchParams();
+  const y = document.getElementById('year').value; if(y) p.set('year', y);
+  const m = document.getElementById('month').value; if(m) p.set('month', m);
+  const w = document.getElementById('week').value; if(w) p.set('week', w);
+  const d = document.getElementById('day').value; if(d) p.set('day', d);
+  const t = document.getElementById('type').value; if(t) p.set('type', t);
+  const c = document.getElementById('category').value; if(c) p.set('category', c);
+  const q = document.getElementById('q').value; if(q) p.set('q', q);
+  const r = await fetch('/api/transactions?'+p.toString());
+  if(r.status === 401){ window.location = '/login'; return []; }
+  return await r.json();
+}
+function peso(v){
+  return new Intl.NumberFormat('es-CL', {style:'currency', currency:'CLP', maximumFractionDigits:0}).format(v);
+}
+let barChart; let pieChart;
+function updateLegend(labels, colors, values){
+  const el = document.getElementById('legend'); if(!el) return;
+  el.innerHTML = '';
+  labels.forEach((lab, i)=>{
+    const item = document.createElement('div');
+    item.className = 'd-flex align-items-center justify-content-between border rounded px-2 py-1';
+    const left = document.createElement('div'); left.className = 'd-flex align-items-center gap-2';
+    const swatch = document.createElement('span'); swatch.style.cssText = `display:inline-block;width:12px;height:12px;border-radius:50%;background:${colors[i]}`;
+    const name = document.createElement('span'); name.textContent = lab;
+    const val = document.createElement('span'); val.textContent = peso(values[i]);
+    left.appendChild(swatch); left.appendChild(name);
+    item.appendChild(left); item.appendChild(val);
+    el.appendChild(item);
+  });
+}
+async function render(){
+  const data = await fetchTx();
+  const total = data.reduce((s,t)=> s + (t.amount||0), 0);
+  document.getElementById('total').textContent = peso(total);
+  const byCat = {};
+  data.forEach(t=>{ const c=(t.category||'otros').toLowerCase(); byCat[c]=(byCat[c]||0)+(t.amount||0); });
+  const labels = Object.keys(byCat);
+  const values = labels.map(k=> byCat[k]);
+  const colors = labels.map(cat=> colorForCategory(cat));
+  // Bar chart
+  const barCfg = {
+    type:'bar',
+    data:{ labels, datasets:[{ label:'CLP', data: values, backgroundColor: colors }]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } } }
+  };
+  // Pie chart
+  const pieCfg = {
+    type:'doughnut',
+    data:{ labels, datasets:[{ data: values, backgroundColor: colors }]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } } }
+  };
+  const barCtx = document.getElementById('catChart').getContext('2d');
+  const pieCtx = document.getElementById('pieChart').getContext('2d');
+  if(barChart){ barChart.destroy(); }
+  if(pieChart){ pieChart.destroy(); }
+  barChart = new Chart(barCtx, barCfg);
+  pieChart = new Chart(pieCtx, pieCfg);
+  updateLegend(labels, colors, values);
+}
+['year','month','week','day','type','category','q'].forEach(id=> document.getElementById(id).addEventListener('input', render));
+
+document.getElementById('resetFilters').addEventListener('click', function(){
+  ['year','month','week','day','type','category','q'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    if(el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
+  });
+  render();
+});
+
+render();
 </script>
-</body>
-</html>
+{% endblock %}

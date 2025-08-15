@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import os
 import bcrypt
 from cryptography.fernet import Fernet, InvalidToken
+from flask_login import UserMixin
 
 # Utilidad de cifrado simétrico para credenciales sensibles (IMAP password)
 # Generar clave una vez y ponerla en variable de entorno APP_ENCRYPTION_KEY (32 url-safe base64 bytes de Fernet)
@@ -43,7 +44,7 @@ class Account(db.Model):
             raise RuntimeError('No se pudo descifrar credenciales (clave incorrecta)')
 
 
-class User(db.Model):
+class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)

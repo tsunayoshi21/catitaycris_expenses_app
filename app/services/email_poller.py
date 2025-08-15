@@ -222,7 +222,7 @@ class EmailProcessor:
             'amount': parsed_data.get('monto', 0.0),
             'merchant': parsed_data.get('comercio'),
             'type': parsed_data.get('tipo_transaccion', 'desconocido'),
-            'suggested_category': parsed_data.get('posible_categoria', 'otros'),
+            'suggested_category': parsed_data.get('posible_categoria', 'sin categoría'),
             'email_date': msg_dt
         }
     
