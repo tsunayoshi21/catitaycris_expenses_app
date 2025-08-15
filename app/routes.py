@@ -1,14 +1,24 @@
-from flask import Blueprint, jsonify, render_template, request, redirect, url_for, flash
+from flask import Blueprint, jsonify, render_template, request, redirect, url_for, flash, session
 from flask_login import login_user, logout_user, login_required, current_user
 from .models import Transaction, User
 from .services.database import db
 import logging
 from datetime import datetime, date, time, timedelta, timezone
+from urllib.parse import urlparse, urljoin
 
 # Logger para este módulo
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('main', __name__)
+
+
+def _is_safe_url(target):
+    try:
+        ref_url = urlparse(request.host_url)
+        test_url = urlparse(urljoin(request.host_url, target))
+        return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
+    except Exception:
+        return False
 
 
 @bp.route('/')
@@ -30,7 +40,11 @@ def login():
         password = request.form.get('password', '').strip()
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
+            session.clear()  # previene fijación de sesión
             login_user(user)
+            next_url = request.args.get('next')
+            if next_url and _is_safe_url(next_url):
+                return redirect(next_url)
             return redirect(url_for('main.index'))
         flash('Credenciales inválidas', 'danger')
     return render_template('login.html')
