@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
+    SECRET_KEY = os.getenv('SECRET_KEY', 'dev-change-me')
     SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'sqlite:///finanzas.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
@@ -13,4 +14,5 @@ class Config:
     IMAP_FOLDER = os.getenv('IMAP_FOLDER', 'INBOX')
     APP_ENCRYPTION_KEY = os.getenv('APP_ENCRYPTION_KEY')
     POLL_INTERVAL = int(os.getenv('POLL_INTERVAL', '60'))  # seconds
-    ALLOWED_BANK_SENDERS = [s.strip().lower() for s in os.getenv('BANK_SENDERS').split(',')]
+    _senders = (os.getenv('BANK_SENDERS') or '').strip().lower()
+    ALLOWED_BANK_SENDERS = [s.strip() for s in _senders.split(',') if s.strip()]

@@ -1,5 +1,6 @@
 import threading
-from flask import Flask
+from flask import Flask, jsonify, redirect, url_for, request
+from flask_login import LoginManager
 from app.config import Config
 from app.services.database import db
 from app.models import Account, User, Transaction
@@ -55,10 +56,10 @@ def configure_global_logging():
     # Configurar loggers específicos para nuestros módulos
     app_loggers = [
         '__main__',
-        'app.email_poller',
-        'app.telegram_bot', 
-        'app.database',
-        'app.llm',
+        'app.services.email_poller',
+        'app.services.telegram_bot', 
+        'app.services.database',
+        'app.services.llm',
         'app.routes',
         'app.models'
     ]
@@ -87,23 +88,45 @@ def configure_global_logging():
     logger.info("Logging configurado - nivel: %s, filtrado solo app", level_name)
 
 
+login_manager = LoginManager()
+login_manager.login_view = 'main.login'
+
+@login_manager.user_loader
+def load_user(user_id):
+    try:
+        return User.query.get(int(user_id))
+    except Exception:
+        return None
+
+@login_manager.unauthorized_handler
+def unauthorized():
+    # Responder JSON para endpoints API
+    if request.path.startswith('/api/'):
+        return jsonify({'ok': False, 'error': 'unauthorized'}), 401
+    return redirect(url_for('main.login'))
+
+
 def create_app(start_services: bool = True):
     # Configurar logging global antes de crear la app
     configure_global_logging()
     
     app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), 'app', 'templates'))
     app.config.from_object(Config)
+    
+    # Inicializar extensiones
     db.init_app(app)
+    login_manager.init_app(app)
+
+    # Registrar blueprints
     app.register_blueprint(bp)
 
     with app.app_context():
         db.create_all()
         # Si no hay cuenta, el admin deberá crearla manualmente por ahora.
     
-    # Lanzar bot
+    # Lanzar bot y poller
     if start_services:
         build_and_run_bot(app)
-        # Lanzar poller
         t = threading.Thread(target=run_poller, args=(app,), daemon=True)
         t.start()
     
