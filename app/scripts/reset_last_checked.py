@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 # Agregar el directorio padre al path para importar la app
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-from app.database import db
+from app.services.database import db
 from app.models import Account
 from main import create_app
 

@@ -23,13 +23,13 @@ class DatabaseManager:
     @staticmethod
     def get_enabled_accounts():
         """Obtiene todas las cuentas habilitadas"""
-        from .models import Account
+        from ..models import Account
         return Account.query.filter_by(enabled=True).all()
     
     @staticmethod
     def is_duplicate_transaction(email_id):
         """Verifica si ya existe una transacción con este email ID"""
-        from .models import Transaction
+        from ..models import Transaction
         return Transaction.query.filter_by(raw_email_id=email_id).first() is not None
     
     @staticmethod
@@ -41,7 +41,7 @@ class DatabaseManager:
     @staticmethod
     def create_pending_transaction(email_data, user):
         """Crea una transacción pendiente de confirmación del usuario"""
-        from .models import Transaction
+        from ..models import Transaction
         
         # Normalizar fecha a UTC
         date_utc = DatabaseManager._ensure_utc(email_data['date'])
@@ -73,7 +73,7 @@ class DatabaseManager:
     @staticmethod
     def update_transaction_description(transaction_id, description, category):
         """Actualiza la descripción y categoría de una transacción"""
-        from .models import Transaction
+        from ..models import Transaction
         
         tx = Transaction.query.get(transaction_id)
         if tx:

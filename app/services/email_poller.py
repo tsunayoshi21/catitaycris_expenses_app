@@ -5,7 +5,7 @@ from email.header import decode_header
 import time
 import re
 from datetime import datetime, timezone
-from .config import Config
+from ..config import Config
 from .database import DatabaseManager
 from .llm import parse_email
 from .telegram_bot import notify_new_transaction

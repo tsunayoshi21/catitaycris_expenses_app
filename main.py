@@ -1,11 +1,11 @@
 import threading
 from flask import Flask
 from app.config import Config
-from app.database import db
+from app.services.database import db
 from app.models import Account, User, Transaction
 from app.routes import bp
-from app.telegram_bot import build_and_run_bot, notify_new_transaction
-from app.email_poller import run_poller
+from app.services.telegram_bot import build_and_run_bot, notify_new_transaction
+from app.services.email_poller import run_poller
 import os
 import logging
 from logging.handlers import RotatingFileHandler

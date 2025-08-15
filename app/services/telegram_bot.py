@@ -3,8 +3,8 @@ from threading import Thread
 from queue import Queue, Empty
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
-from .config import Config
-from .models import User
+from ..config import Config
+from ..models import User
 from .database import DatabaseManager
 from .llm import categorize
 import asyncio

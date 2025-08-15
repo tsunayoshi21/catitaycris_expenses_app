@@ -1,4 +1,4 @@
-from .database import db
+from .services.database import db
 from datetime import datetime, timezone
 import os
 import bcrypt
