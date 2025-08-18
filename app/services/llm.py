@@ -2,28 +2,19 @@ import os
 import json
 import requests
 import logging
+from document_utils import load_prompt
 
 # Logger para este módulo
 logger = logging.getLogger(__name__)
 
-SYSTEM_PARSE = ("Eres un asistente que extrae campos estructurados de correos bancarios chilenos. "
-                "Devuelve JSON estricto con: tipo_transaccion (debito|credito|transferencia|desconocido), "
-                "monto (float), comercio (string|null, si es transferencia debe ser el nombre de a quien se transfiere), "
-                "fecha_iso (ISO8601 o null). Usa punto como decimal. Como consideración adicional, no guardes "
-                "el rut de las personas involucradas, solo el nombre o comercio.")
-
-SYSTEM_CATEGORIZE = ("Eres un asistente que asigna una categoría corta a un gasto personal en Chile. "
-                     "Responde solo la categoría en minúsculas "
-                     "(ej: comida, transporte, entretenimiento, viajes, regalos y donaciones, otros).")
-
+SYSTEM_PARSE = load_prompt("system_parse.txt")
+SYSTEM_CATEGORIZE = load_prompt("system_categorize.txt")
 
 def _api_base() -> str:
     return os.getenv('OPENAI_BASE_URL', 'https://api.openai.com')
 
-
 def _api_key() -> str | None:
     return os.getenv('OPENAI_API_KEY')
-
 
 def _chat_completions(payload: dict) -> dict | None:
     key = _api_key()
@@ -41,7 +32,6 @@ def _chat_completions(payload: dict) -> dict | None:
         return resp.json()
     except Exception:
         return None
-
 
 def parse_email(subject: str, body: str) -> dict:
     prompt = f"Asunto: {subject}\n\nCuerpo:\n{body}"
@@ -62,7 +52,6 @@ def parse_email(subject: str, body: str) -> dict:
         return json.loads(content)
     except Exception:
         return {}
-
 
 def categorize(description: str, merchant: str | None = None) -> str:
     base = description or ''
