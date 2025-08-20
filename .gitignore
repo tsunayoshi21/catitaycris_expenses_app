@@ -6,3 +6,5 @@ __pycache__/
 *.pyo
 *.pyd
 *.sqlite3
+create_user.sh
+meetings

@@ -1,4 +1,5 @@
 import imaplib
+from bs4 import BeautifulSoup
 import email
 import email.utils
 from email.header import decode_header
@@ -21,23 +22,6 @@ class EmailProcessor:
     def __init__(self, account):
         self.account = account
         self.imap_user, self.imap_password = account.get_imap_credentials()
-
-    def is_subject_supported(self, subject):
-        # Currently only support Banco de Chile emails
-        # Currently only support charges and transfers, not incomes
-        valid_subjects = ["Transferencia a Terceros",
-                            "Cargo en Cuenta",
-                            "Compra con Tarjeta de Crédito"]
-        
-        return subject in valid_subjects
-
-    def _ensure_utc(self, dt):
-        """Convierte datetime a UTC"""
-        if not dt:
-            return None
-        if dt.tzinfo is None:
-            return dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc)
     
     def _decode_header(self, val):
         """Decodifica headers de email"""
@@ -54,108 +38,32 @@ class EmailProcessor:
             else:
                 out.append(txt)
         return ''.join(out)
-    
-    def _get_email_body(self, msg):
-        """Extrae el cuerpo de texto del email, priorizando texto plano sobre HTML"""
-        # Primero intentar obtener texto plano
-        plain_text = self._get_plain_text_body(msg)
-        if plain_text and len(plain_text.strip()) > 50:  # Si hay suficiente texto plano
-            return plain_text
         
-        # Si no hay texto plano suficiente, procesar HTML
-        html_text = self._get_html_body(msg)
-        if html_text:
-            return self._extract_text_from_html(html_text)
-        
-        return plain_text or ''
-    
-    def _get_plain_text_body(self, msg):
-        """Extrae el cuerpo de texto plano del email"""
+    def extract_text_from_email(self, msg):
+        text_content = None
+        html_content = None
+
         if msg.is_multipart():
             for part in msg.walk():
-                if part.get_content_type() == 'text/plain':
-                    try:
-                        return part.get_payload(decode=True).decode(errors='ignore')
-                    except Exception:
-                        continue
+                content_type = part.get_content_type()
+                content_disposition = str(part.get("Content-Disposition"))
+
+                if content_type == "text/plain" and "attachment" not in content_disposition:
+                    text_content = part.get_payload(decode=True).decode(part.get_content_charset() or "utf-8", errors="ignore")
+                elif content_type == "text/html" and "attachment" not in content_disposition:
+                    html_content = part.get_payload(decode=True).decode(part.get_content_charset() or "utf-8", errors="ignore")
         else:
-            if msg.get_content_type() == 'text/plain':
-                try:
-                    return msg.get_payload(decode=True).decode(errors='ignore')
-                except Exception:
-                    pass
-        return ''
-    
-    def _get_html_body(self, msg):
-        """Extrae el cuerpo HTML del email"""
-        if msg.is_multipart():
-            for part in msg.walk():
-                if part.get_content_type() == 'text/html':
-                    try:
-                        return part.get_payload(decode=True).decode(errors='ignore')
-                    except Exception:
-                        continue
-        else:
-            if msg.get_content_type() == 'text/html':
-                try:
-                    return msg.get_payload(decode=True).decode(errors='ignore')
-                except Exception:
-                    pass
-        return ''
-    
-    def _extract_text_from_html(self, html_content):
-        """Extrae información relevante del HTML bancario"""
-        import re
-        
-        # Limpiar HTML básico
-        text = re.sub(r'<[^>]+>', ' ', html_content)
-        text = re.sub(r'\s+', ' ', text).strip()
-        
-        # Buscar patrones específicos de emails bancarios
-        relevant_info = []
-        
-        # Patrones de búsqueda para información bancaria
-        patterns = {
-            'titulo': r'(Comprobante de [^\.]+|Transferencia a [^\.]+|Cargo en [^\.]+|Compra con [^\.]+)',
-            'monto': r'\$\s*[\d,\.]+',
-            'destinatario': r'(?:Nombre y Apellido|Destinatario)[:\s]*([A-Za-z\s]+)',
-            'comercio': r'(?:Comercio|Establecimiento)[:\s]*([A-Za-z0-9\s\-]+)',
-            'fecha_hora': r'(?:Fecha y Hora)[:\s]*([^\.]+)',
-            'transaccion': r'(?:Transacción)[:\s]*([A-Z0-9]+)',
-            'cuenta_origen': r'(?:N°? de Cuenta)[:\s]*([0-9\-]+)',
-            'tipo_cuenta': r'(?:Tipo de Cuenta)[:\s]*([A-Za-z\s]+)',
-            'banco': r'(?:Banco)[:\s]*([A-Za-z\s/]+)',
-        }
-        
-        for key, pattern in patterns.items():
-            matches = re.findall(pattern, text, re.IGNORECASE)
-            if matches:
-                # Limpiar y agregar matches
-                clean_matches = [m.strip() for m in matches if m.strip()]
-                if clean_matches:
-                    relevant_info.append(f"{key.replace('_', ' ')}: {', '.join(clean_matches[:3])}")  # Máximo 3 matches
-        
-        # Extraer secciones importantes
-        sections = ['Origen', 'Destino', 'Monto', 'Mensaje']
-        for section in sections:
-            # Buscar contenido entre sección y próxima sección o final
-            pattern = rf'{section}.*?(?={"|".join(sections)}|\Z)'
-            match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
-            if match:
-                section_text = match.group(0).strip()
-                # Limpiar y resumir
-                section_text = re.sub(r'\s+', ' ', section_text)
-                if len(section_text) > 20:  # Solo si tiene contenido útil
-                    relevant_info.append(section_text[:200])  # Limitar a 200 chars
-        
-        # Combinar información relevante
-        if relevant_info:
-            result = '\n'.join(relevant_info)
-            # Limitar tamaño total para el LLM
-            return result[:2000] if len(result) > 2000 else result
-        
-        # Fallback: devolver texto limpio pero limitado
-        return text[:1500] if len(text) > 1500 else text
+            if msg.get_content_type() == "text/plain":
+                text_content = msg.get_payload(decode=True).decode(msg.get_content_charset() or "utf-8", errors="ignore")
+            elif msg.get_content_type() == "text/html":
+                html_content = msg.get_payload(decode=True).decode(msg.get_content_charset() or "utf-8", errors="ignore")
+
+        # Si no hay texto plano, sacar del HTML
+        if not text_content and html_content:
+            soup = BeautifulSoup(html_content, "html.parser")
+            text_content = soup.get_text(separator="\n", strip=True)
+
+        return text_content
     
     def _build_imap_search(self):
         """Construye la query de búsqueda IMAP"""
@@ -196,11 +104,30 @@ class EmailProcessor:
             return self._ensure_utc(msg_dt)
         except Exception:
             return None
+        
+    def _ensure_utc(self, dt):
+        """Convierte datetime a UTC"""
+        if not dt:
+            return None
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
     
     def _is_from_bank(self, email_from):
         """Verifica si el email viene de un banco permitido"""
         from_lower = email_from.lower()
         return any(sender in from_lower for sender in Config.ALLOWED_BANK_SENDERS)
+    
+    def is_subject_supported(self, subject):
+        # Currently only support Banco de Chile emails
+        # Currently only support charges and transfers, not incomes
+        valid_subjects = [
+            "Transferencia a Terceros",
+            "Cargo en Cuenta",
+            "Compra con Tarjeta de Crédito"
+        ]
+
+        return subject in valid_subjects
     
     def _create_email_data(self, msg, parsed_data):
         """Crea estructura de datos del email procesado"""
@@ -295,7 +222,7 @@ class EmailProcessor:
         
         # Parsear con LLM
         subject = self._decode_header(msg.get('Subject', ''))
-        body = self._get_email_body(msg)
+        body = self.extract_text_from_email(msg)
 
         if self.is_subject_supported(subject):
             logger.debug('Procesando email con asunto: %s', subject)

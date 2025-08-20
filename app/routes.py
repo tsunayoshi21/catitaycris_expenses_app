@@ -112,6 +112,8 @@ def api_transactions():
     start, end = _parse_date_filters(request.args)
 
     query = Transaction.query.filter_by(user_id=current_user.id)
+    logger.info(f"Transacciones de usuario {current_user.id} - Filtros: q={q}, category={category}, type={ttype}, start={start}, end={end}")
+    
 
     if start and end:
         query = query.filter(Transaction.date >= start, Transaction.date < end)
