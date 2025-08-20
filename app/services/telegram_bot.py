@@ -1,7 +1,7 @@
 import os
 from threading import Thread
 from queue import Queue, Empty
-from telegram import Update
+from telegram import Update, ForceReply
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from ..config import Config
 from ..models import User
@@ -9,11 +9,11 @@ from .database import DatabaseManager
 from .llm import categorize
 import asyncio
 import logging
+import re
 
 # Logger para este módulo
 logger = logging.getLogger(__name__)
 
-pending_questions = {}  # chat_id -> transaction_id
 notification_queue = Queue()  # Queue para envío thread-safe
 
 
@@ -62,36 +62,42 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         text = update.message.text.strip()
         
-        if chat_id in pending_questions:
-            # Usuario respondió sobre una transacción pendiente
-            tx_id = pending_questions.pop(chat_id)
-            logger.info('💳 Procesando respuesta para transacción tx_id=%s del usuario=%s', 
-                                   tx_id, user.username)
+        # Nuevo flujo: usar reply_to_message para identificar la transacción (#<id>)
+        replied = getattr(update.message, 'reply_to_message', None)
+        if replied and replied.from_user and replied.from_user.is_bot:
+            original_text = replied.text or ''
+            m = re.search(r'#(\d+)', original_text)
+            if not m:
+                logger.warning('❌ No se encontró tx_id en el mensaje referenciado por chat_id=%s', chat_id)
+                await update.message.reply_text('❌ No pude identificar la transacción. Responde al mensaje del bot que contiene el ID (#123).')
+                return
+            tx_id = int(m.group(1))
+            logger.info('💳 Procesando respuesta para transacción tx_id=%s del usuario=%s', tx_id, user.username)
             
             # Categorizar respuesta del usuario
             logger.debug('🤖 Categorizando respuesta: "%s"', text)
             category = categorize(text)
             logger.debug('📁 Categoría asignada: "%s"', category)
             
-            # Actualizar transacción
+            # Actualizar transacción (la validación de pertenencia debería ocurrir en capa de DB)
             tx = DatabaseManager.update_transaction_description(tx_id, text, category)
             if tx:
-                logger.info('✅ Transacción tx_id=%s actualizada - descripción="%s" categoría="%s"', 
-                                       tx_id, text, category)
+                logger.info('✅ Transacción tx_id=%s actualizada - descripción="%s" categoría="%s"', tx_id, text, category)
                 await update.message.reply_text(
-                    f'✅ Transacción guardada:\n'
+                    f'✅ Transacción #{tx_id} guardada:\n'
                     f'💬 Descripción: {text}\n'
                     f'📁 Categoría: {category}'
                 )
             else:
-                logger.error('❌ Error: transacción tx_id=%s no encontrada en DB', tx_id)
-                await update.message.reply_text('❌ Error: transacción no encontrada.')
-        else:
-            # Mensaje sin contexto
-            logger.debug('💡 No hay transacciones pendientes para chat_id=%s', chat_id)
-            await update.message.reply_text(
-                f'💡 No hay transacciones pendientes.'
-            )
+                logger.error('❌ Error: transacción tx_id=%s no encontrada en DB o no pertenece al usuario', tx_id)
+                await update.message.reply_text('❌ Error: transacción no encontrada o no autorizada.')
+            return
+        
+        # Si no es una respuesta a un mensaje del bot con #id, guiar al usuario
+        logger.debug('💡 Mensaje sin referencia válida a transacción para chat_id=%s', chat_id)
+        await update.message.reply_text(
+            '💡 Para registrar una descripción, responde directamente al mensaje de la transacción que contiene el ID (por ejemplo, #123).'
+        )
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
@@ -116,18 +122,16 @@ async def process_notification_queue(application):
             
             logger.debug("📤 Procesando notificación para chat_id=%s tx_id=%s", chat_id, transaction_id)
             
-            # Guardar transacción como pendiente
-            pending_questions[chat_id] = transaction_id
-            logger.debug("⏳ Transacción tx_id=%s marcada como pendiente para chat_id=%s", transaction_id, chat_id)
-            
-            # Enviar mensaje
+            # Enviar mensaje con ForceReply para facilitar la respuesta directa
             try:
-                await application.bot.send_message(chat_id=chat_id, text=message)
+                await application.bot.send_message(
+                    chat_id=chat_id,
+                    text=message + "\n\n✍️ Responde a ESTE mensaje con la descripción para la transacción #" + str(transaction_id),
+                    reply_markup=ForceReply(selective=True, input_field_placeholder=f"Descripción para #" + str(transaction_id))
+                )
                 logger.info("✅ Notificación enviada exitosamente a chat_id=%s", chat_id)
             except Exception as e:
                 logger.error("❌ Error enviando mensaje a chat_id=%s: %s", chat_id, e)
-                # Remover de pendientes si falló el envío
-                pending_questions.pop(chat_id, None)
                 
         except Exception as e:
             logger.error("❌ Error procesando cola de notificaciones: %s", e)
@@ -145,9 +149,9 @@ def notify_new_transaction(app, transaction):
         logger.info('📲 Preparando notificación para usuario=%s chat_id=%s tx_id=%s', 
                        user.username, user.chat_id, transaction.id)
         
-        # Crear mensaje informativo
+        # Crear mensaje informativo incluyendo #<id>
         msg = (
-            f"💳 Nueva transacción detectada:\n\n"
+            f"💳 Nueva transacción detectada (#"+str(transaction.id)+"):\n\n"
             f"📅 Fecha: {transaction.date.strftime('%d/%m/%Y %H:%M')}\n"
             f"💰 Monto: ${transaction.amount:,.0f}\n"
             f"🏪 Comercio: {transaction.merchant or 'No especificado'}\n"
