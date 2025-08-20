@@ -126,7 +126,12 @@ def create_app(start_services: bool = True):
     # Configurar logging global antes de crear la app
     configure_global_logging()
     
-    app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), 'app', 'templates'))
+    app = Flask(
+        __name__,
+        template_folder=os.path.join(os.path.dirname(__file__), 'app', 'templates'),
+        static_folder=os.path.join(os.path.dirname(__file__), 'app', 'static'),
+        static_url_path='/static'
+    )
     app.config.from_object(Config)
     
     # Inicializar extensiones
@@ -160,7 +165,7 @@ def create_app(start_services: bool = True):
     def favicon():
         """Serve favicon to avoid 404s"""
         try:
-            return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico', mimetype='image/x-icon')
+            return send_from_directory(app.static_folder, 'favicon.ico', mimetype='image/x-icon')
         except Exception:
             # Fallback: 204 No Content to avoid log noise if file missing
             from flask import Response
