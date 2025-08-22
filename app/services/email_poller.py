@@ -17,14 +17,35 @@ logger = logging.getLogger(__name__)
 
 
 class EmailProcessor:
-    """Procesa emails de una cuenta IMAP"""
+    """Procesa correos electrónicos de una cuenta IMAP y extrae transacciones.
+
+    Attributes:
+        account: Objeto de cuenta que expone `get_imap_credentials()`,
+            `last_checked`, `imap_host`, entre otros atributos usados por el poller.
+        imap_user: Usuario IMAP asociado a la cuenta (obtenido desde la cuenta).
+        imap_password: Contraseña IMAP asociada a la cuenta (obtenida desde la cuenta).
+    """
     
     def __init__(self, account):
+        """Inicializa el procesador para una cuenta IMAP.
+
+        Args:
+            account: Instancia que representa la cuenta a procesar. Debe proveer
+                `get_imap_credentials()`, `imap_host`, `last_checked`, etc.
+        """
         self.account = account
         self.imap_user, self.imap_password = account.get_imap_credentials()
     
     def _decode_header(self, val):
-        """Decodifica headers de email"""
+        """Decodifica un header MIME (RFC 2047) a texto Unicode.
+
+        Args:
+            val: Valor del header a decodificar.
+
+        Returns:
+            Cadena decodificada en Unicode. Si el valor es None o vacío, retorna
+            una cadena vacía.
+        """
         if not val:
             return ''
         parts = decode_header(val)
@@ -40,6 +61,17 @@ class EmailProcessor:
         return ''.join(out)
         
     def extract_text_from_email(self, msg):
+        """Extrae el contenido textual de un mensaje de correo MIME.
+
+        Prioriza `text/plain`; si no existe, convierte el contenido `text/html`
+        a texto plano usando BeautifulSoup.
+
+        Args:
+            msg: Mensaje de correo (`email.message.Message`).
+
+        Returns:
+            Texto del cuerpo del mensaje o None si no pudo extraerse.
+        """
         text_content = None
         html_content = None
 
@@ -66,7 +98,16 @@ class EmailProcessor:
         return text_content
     
     def _build_imap_search(self):
-        """Construye la query de búsqueda IMAP"""
+        """Construye el criterio de búsqueda IMAP para encontrar correos relevantes.
+
+        El criterio usa la fecha de corte (`last_checked`) y los remitentes
+        permitidos (`Config.ALLOWED_BANK_SENDERS`). Cuando no hay criterios,
+        se usa `(UNSEEN)` como predeterminado.
+
+        Returns:
+            Cadena con la búsqueda IMAP, por ejemplo: `(SINCE 01-Jan-2025 FROM banco@example.com)`
+            o `(UNSEEN)` cuando no hay filtros.
+        """
         search_parts = []
         
         # Filtro por fecha
@@ -94,7 +135,15 @@ class EmailProcessor:
         return '(' + ' '.join(search_parts) + ')' if search_parts else '(UNSEEN)'
     
     def _parse_email_date(self, msg):
-        """Extrae y normaliza la fecha del email"""
+        """Extrae y normaliza la fecha del correo desde el header `Date`.
+
+        Args:
+            msg: Mensaje de correo del cual leer el header `Date`.
+
+        Returns:
+            Objeto `datetime` con zona horaria UTC, o `None` si no existe el header
+            o no se pudo parsear.
+        """
         date_hdr = msg.get('Date')
         if not date_hdr:
             return None
@@ -106,7 +155,17 @@ class EmailProcessor:
             return None
         
     def _ensure_utc(self, dt):
-        """Convierte datetime a UTC"""
+        """Convierte un objeto `datetime` a zona horaria UTC.
+
+        Si el `datetime` es naive (sin tzinfo), se asume UTC. Si tiene zona
+        horaria, se convierte a UTC.
+
+        Args:
+            dt: Instancia de `datetime` a normalizar. Puede ser naive o aware.
+
+        Returns:
+            `datetime` con tz UTC, o `None` si `dt` es `None`.
+        """
         if not dt:
             return None
         if dt.tzinfo is None:
@@ -114,11 +173,30 @@ class EmailProcessor:
         return dt.astimezone(timezone.utc)
     
     def _is_from_bank(self, email_from):
-        """Verifica si el email viene de un banco permitido"""
+        """Verifica si el remitente pertenece a un banco permitido.
+
+        Args:
+            email_from: Valor del header `From` ya decodificado.
+
+        Returns:
+            `True` si el remitente contiene alguno de los valores en
+            `Config.ALLOWED_BANK_SENDERS`; `False` de lo contrario.
+        """
         from_lower = email_from.lower()
         return any(sender in from_lower for sender in Config.ALLOWED_BANK_SENDERS)
     
     def is_subject_supported(self, subject):
+        """Comprueba si el asunto del correo es soportado por el parser actual.
+
+        Actualmente se soportan asuntos de Banco de Chile para cargos y
+        transferencias, no ingresos.
+
+        Args:
+            subject: Asunto del correo.
+
+        Returns:
+            `True` si el asunto es soportado; `False` en caso contrario.
+        """
         # Currently only support Banco de Chile emails
         # Currently only support charges and transfers, not incomes
         valid_subjects = [
@@ -130,7 +208,17 @@ class EmailProcessor:
         return subject in valid_subjects
     
     def _create_email_data(self, msg, parsed_data):
-        """Crea estructura de datos del email procesado"""
+        """Construye el diccionario de datos normalizados para una transacción.
+
+        Usa la fecha del email o la fecha parseada por el LLM (`fecha_iso`) y
+        rellena los campos necesarios para crear una transacción pendiente.
+
+        Args:
+            msg: Mensaje de correo original.
+            parsed_data: Diccionario resultante del LLM 
+        Returns:
+            Diccionario con los datos de la transacción
+        """
         msg_dt = self._parse_email_date(msg)
         msg_id = msg.get('Message-ID') or f"{self.account.id}:{id(msg)}"
         
@@ -154,7 +242,23 @@ class EmailProcessor:
         }
     
     def process_emails(self):
-        """Procesa todos los emails nuevos de la cuenta"""
+        """Procesa los correos nuevos de la cuenta y devuelve transacciones candidatas.
+
+        Pasos principales:
+          - Establece conexión IMAP y autentica
+          - Construye y ejecuta la búsqueda
+          - Evita duplicados mediante `Message-ID`
+          - Parsea correos soportados con el LLM
+          - Actualiza `last_checked` con la mayor fecha vista
+
+        Returns:
+            Lista de diccionarios de transacción (ver `_create_email_data`).
+
+        Raises:
+            imaplib.IMAP4.error: Por errores de IMAP (login, selección de carpeta, etc.).
+            Exception: Errores inesperados al procesar correos individuales se
+                registran y se continúa con el resto.
+        """
         logger.debug('Procesando cuenta %s (last_checked=%s)', 
                                 self.account.id, self.account.last_checked)
         
@@ -202,7 +306,16 @@ class EmailProcessor:
                 pass
     
     def _process_single_email(self, conn, email_id):
-        """Procesa un email individual"""
+        """Procesa un correo individual obtenido desde IMAP.
+
+        Args:
+            conn: Conexión IMAP autenticada (`imaplib.IMAP4_SSL`).
+            email_id: Identificador del mensaje en IMAP (bytes).
+
+        Returns:
+            Diccionario con los datos de la transacción si el correo es válido
+            y soportado; `None` en caso contrario o si es duplicado.
+        """
         status, msg_data = conn.fetch(email_id, '(RFC822)')
         if status != 'OK':
             return None
@@ -236,7 +349,20 @@ class EmailProcessor:
 
 
 def poll_once(app):
-    """Ejecuta un ciclo de polling para todas las cuentas"""
+    """Ejecuta un ciclo de polling para todas las cuentas habilitadas.
+
+    Dentro del contexto de la aplicación Flask:
+      - Obtiene cuentas habilitadas
+      - Procesa correos por cuenta
+      - Crea transacciones pendientes
+      - Notifica al usuario por Telegram
+
+    Args:
+        app: Instancia de Flask usada para establecer el contexto de aplicación.
+
+    Returns:
+        Lista de objetos `Transaction` creados durante el ciclo.
+    """
     with app.app_context():
         accounts = DatabaseManager.get_enabled_accounts()
         if not accounts:
@@ -274,7 +400,17 @@ def poll_once(app):
 
 
 def run_poller(app):
-    """Loop principal del poller"""
+    """Bucle principal del poller de correos electrónicos.
+
+    Registra el inicio, ejecuta `poll_once` en un ciclo infinito y maneja
+    excepciones, durmiendo entre iteraciones según `Config.POLL_INTERVAL`.
+
+    Args:
+        app: Instancia de Flask de la aplicación.
+
+    Returns:
+        None. Este bucle no retorna bajo condiciones normales.
+    """
     logger.info('Iniciando email poller (intervalo %ss)', Config.POLL_INTERVAL)
     
     while True:

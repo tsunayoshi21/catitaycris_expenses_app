@@ -1,7 +1,6 @@
 from flask import Blueprint, jsonify, render_template, request, redirect, url_for, flash, session
 from flask_login import login_user, logout_user, login_required, current_user
-from .models import Transaction, User
-from .services.database import db
+from .services.database import DatabaseManager
 import logging
 from datetime import datetime, date, time, timedelta, timezone
 from urllib.parse import urlparse, urljoin
@@ -38,7 +37,7 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
-        user = User.query.filter_by(username=username).first()
+        user = DatabaseManager.get_user_by_username(username)
         if user and user.check_password(password):
             session.clear()  # previene fijación de sesión
             login_user(user)
@@ -111,24 +110,20 @@ def api_transactions():
 
     start, end = _parse_date_filters(request.args)
 
-    query = Transaction.query.filter_by(user_id=current_user.id)
-    logger.info(f"Transacciones de usuario {current_user.id} - Filtros: q={q}, category={category}, type={ttype}, start={start}, end={end}")
-    
+    logger.info(
+        "Transacciones de usuario %s - Filtros: q=%s, category=%s, type=%s, start=%s, end=%s",
+        current_user.id, q, category, ttype, start, end,
+    )
 
-    if start and end:
-        query = query.filter(Transaction.date >= start, Transaction.date < end)
-    if category:
-        query = query.filter(db.func.lower(Transaction.category).contains(category))
-    if ttype:
-        query = query.filter(Transaction.type == ttype)
-
-    txs = query.order_by(Transaction.date.desc()).limit(2000).all()
-
-    if q:
-        def match_q(t: Transaction) -> bool:
-            blob = f"{t.merchant or ''} {t.description or ''} {t.category or ''} {t.type or ''}".lower()
-            return q in blob
-        txs = [t for t in txs if match_q(t)]
+    txs = DatabaseManager.get_transactions_for_user(
+        user_id=current_user.id,
+        q=q,
+        category=category,
+        ttype=ttype,
+        start=start,
+        end=end,
+        limit=2000,
+    )
 
     return jsonify([t.to_dict() for t in txs])
 
@@ -141,15 +136,17 @@ def api_update_transaction():
     if not tx_id:
         return jsonify({'ok': False, 'error': 'id requerido'}), 400
 
-    tx = Transaction.query.filter_by(id=tx_id, user_id=current_user.id).first()
+    description = data.get('description')
+    category = data.get('category')
+
+    tx = DatabaseManager.update_transaction_for_user(
+        user_id=current_user.id,
+        transaction_id=tx_id,
+        description=description,
+        category=category,
+    )
+
     if not tx:
         return jsonify({'ok': False, 'error': 'no encontrado'}), 404
 
-    # Campos editables
-    if 'description' in data:
-        tx.description = (data['description'] or '').strip() or None
-    if 'category' in data:
-        tx.category = (data['category'] or '').strip() or None
-
-    db.session.commit()
     return jsonify({'ok': True, 'transaction': tx.to_dict()})

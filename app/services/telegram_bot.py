@@ -1,3 +1,10 @@
+"""Bot de Telegram para notificar y registrar descripciones de transacciones.
+
+Este módulo inicializa el bot, envía notificaciones a los usuarios y procesa
+sus respuestas usando respuestas por referencia (reply) al mensaje del bot que
+incluye el identificador de la transacción (#<id>).
+"""
+
 import os
 from threading import Thread
 from queue import Queue, Empty
@@ -18,6 +25,19 @@ notification_queue = Queue()  # Queue para envío thread-safe
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Comando /start del bot.
+
+    Verifica que exista contexto de Flask, valida si el usuario está
+    registrado por `chat_id` y confirma la activación del bot. Si no está
+    registrado, informa al usuario que contacte al administrador.
+
+    Args:
+        update: Actualización recibida por el bot (mensaje /start).
+        context: Contexto de ejecución del handler de Telegram.
+
+    Returns:
+        None. Responde al usuario según el estado de registro.
+    """
     flask_app = context.application.bot_data.get('flask_app')
     if not flask_app:
         return
@@ -37,6 +57,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja mensajes de texto enviados por el usuario.
+
+    Si el mensaje es una respuesta (reply) al mensaje del bot que contiene un
+    identificador de transacción (#<id>), categoriza y guarda la descripción
+    para esa transacción. En caso contrario, guía al usuario sobre cómo
+    responder correctamente.
+
+    Args:
+        update: Actualización con el mensaje del usuario.
+        context: Contexto de ejecución del handler de Telegram.
+
+    Returns:
+        None. Envía respuestas informativas al usuario.
+    """
     flask_app = context.application.bot_data.get('flask_app')
     if not flask_app:
         return
@@ -101,12 +135,35 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+    """Handler global de errores del bot.
+
+    Registra con nivel de excepción cualquier error producido durante el
+    procesamiento de una actualización.
+
+    Args:
+        update: Objeto de actualización asociado al error (puede ser None).
+        context: Contexto con información del error (`context.error`).
+
+    Returns:
+        None.
+    """
     logger.exception('Error en Telegram bot: update=%s error=%s', 
                     getattr(update, 'update_id', None), context.error)
 
 
 async def process_notification_queue(application):
-    """Procesa la cola de notificaciones de forma asíncrona"""
+    """Procesa la cola de notificaciones de forma asíncrona y continua.
+
+    Extrae mensajes de `notification_queue` y los envía al usuario con
+    `ForceReply` para facilitar la respuesta directa al mensaje con el
+    identificador de la transacción.
+
+    Args:
+        application: Instancia de `Application` de python-telegram-bot.
+
+    Returns:
+        None. Se ejecuta en bucle infinito.
+    """
     while True:
         try:
             # Esperar por notificaciones en la cola
@@ -139,7 +196,19 @@ async def process_notification_queue(application):
 
 
 def notify_new_transaction(app, transaction):
-    """Notifica al usuario sobre una nueva transacción para que la describa"""
+    """Encola una notificación de nueva transacción para un usuario.
+
+    Construye un mensaje con la información de la transacción e inserta un
+    registro en `notification_queue` para su envío por el worker asíncrono.
+
+    Args:
+        app: Instancia de Flask para abrir un contexto de aplicación.
+        transaction: Objeto de transacción con atributos `id`, `date`, `amount`,
+            `merchant`, `type`, `category` y relación `user` con `chat_id`.
+
+    Returns:
+        None. Si el usuario no tiene `chat_id`, no se encola ninguna notificación.
+    """
     with app.app_context():
         user = transaction.user
         if not user.chat_id:
@@ -180,7 +249,18 @@ def notify_new_transaction(app, transaction):
 
 
 def build_and_run_bot(app):
-    """Inicializa y ejecuta el bot de Telegram"""
+    """Inicializa el bot de Telegram y lo ejecuta en un hilo daemon.
+
+    Crea la aplicación de Telegram, registra handlers, inicia el polling y
+    arranca una tarea asíncrona para procesar la cola de notificaciones.
+
+    Args:
+        app: Instancia de Flask para compartir contexto con el bot.
+
+    Returns:
+        Thread | None: Hilo daemon en el que corre el bot, o None si no hay
+        `TELEGRAM_BOT_TOKEN` configurado.
+    """
     token = Config.TELEGRAM_BOT_TOKEN
     if not token:
         logger.warning('❌ TELEGRAM_BOT_TOKEN no configurado')
@@ -189,8 +269,21 @@ def build_and_run_bot(app):
     logger.info('🚀 Configurando bot de Telegram...')
     
     def _run_bot():
-        """Ejecuta el bot en un hilo separado"""
+        """Ejecuta el ciclo de vida del bot en un hilo dedicado.
+
+        Inicializa la aplicación asíncrona, configura handlers, arranca el
+        polling y gestiona el apagado ordenado del bot.
+
+        Returns:
+            None.
+        """
         async def _async_main():
+            """Rutina asíncrona principal del bot.
+
+            Crea `Application`, registra handlers, inicia polling y lanza la
+            tarea de procesamiento de notificaciones hasta que el proceso
+            finalice.
+            """
             logger.info('🔧 Inicializando aplicación Telegram...')
             application = ApplicationBuilder().token(token).build()
             application.bot_data['flask_app'] = app
