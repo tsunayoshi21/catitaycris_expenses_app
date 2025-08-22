@@ -96,19 +96,19 @@ class DatabaseManager:
         return User.query.filter_by(username=username).first()
 
     @staticmethod
-    def get_transactions_for_user(user_id: int, q: str = '', category: str = '', ttype: str = None,
+    def get_transactions_for_user(user_id: int, q: str = '', category: str = '', ttypes=None,
                                   start=None, end=None, limit: int = 2000):
         """Obtiene transacciones filtradas para un usuario.
 
-        Aplica filtros por rango de fechas, categoría (case-insensitive), tipo y
-        ordena por fecha descendente. El filtro de búsqueda libre `q` se aplica
+        Aplica filtros por rango de fechas, categoría (case-insensitive), tipos (multi)
+        y ordena por fecha descendente. El filtro de búsqueda libre `q` se aplica
         en memoria para mantener compatibilidad entre motores (SQLite/Postgres).
 
         Args:
             user_id: ID del usuario propietario de las transacciones.
             q: Texto de búsqueda libre (opcional, minúsculas recomendado).
             category: Categoría a buscar (case-insensitive).
-            ttype: Tipo de transacción exacto.
+            ttypes: Lista de tipos de transacción (p.ej. ['debito','credito']). Si None, no filtra por tipo.
             start: datetime de inicio (UTC) inclusive.
             end: datetime de término (UTC) exclusivo.
             limit: Límite de filas a retornar.
@@ -122,8 +122,8 @@ class DatabaseManager:
             query = query.filter(Transaction.date >= start, Transaction.date < end)
         if category:
             query = query.filter(db.func.lower(Transaction.category).contains(category))
-        if ttype:
-            query = query.filter(Transaction.type == ttype)
+        if ttypes:
+            query = query.filter(Transaction.type.in_(ttypes))
 
         txs = query.order_by(Transaction.date.desc()).limit(limit).all()
 

@@ -3,20 +3,13 @@ document.addEventListener('DOMContentLoaded', () => {
   function peso(v){
     try{ return new Intl.NumberFormat('es-CL', {style:'currency', currency:'CLP', maximumFractionDigits:0}).format(v||0); }catch{ return v; }
   }
-  function buildParams(){
-    const p = new URLSearchParams();
-    const y = document.getElementById('year')?.value; if(y) p.set('year', y);
-    const m = document.getElementById('month')?.value; if(m) p.set('month', m);
-    const w = document.getElementById('week')?.value; if(w) p.set('week', w);
-    const d = document.getElementById('day')?.value; if(d) p.set('day', d);
-    const t = document.getElementById('type')?.value; if(t) p.set('type', t);
-    const c = document.getElementById('category')?.value; if(c) p.set('category', c);
-    const q = document.getElementById('q')?.value; if(q) p.set('q', q);
-    return p.toString();
-  }
+
   async function fetchData(){
     try{
-      const qs = buildParams();
+      // Use Filters.getQueryString and log
+      const fromFilters = (window.Filters?.getQueryString && window.Filters.getQueryString()) || '';
+      const qs = fromFilters;
+      console.log('Fetching transactions with query:', qs);
       const res = await fetch('/api/transactions' + (qs? ('?' + qs) : ''));
       if(res.status === 401){ window.location = '/login'; return []; }
       if(!res.ok){ console.error('API error', res.status); showErr('Error cargando transacciones ('+res.status+').'); return []; }
@@ -61,7 +54,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const rows = data.map(toRow);
     table.clear().rows.add(rows).draw();
   }
+
   async function init(){
+    // Inicializar filtros globales y sincronización solo con backend (no URL)
+    window.Filters.init({ onChange: () => { reload(); }, syncURL: false });
+
     const data = await fetchData();
     const rows = data.map(toRow);
     table = $('#txTable').DataTable({
@@ -105,23 +102,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     });
-
-    ['year','month','week','day','type','category','q'].forEach(id=>{
-      const el = document.getElementById(id);
-      if(!el) return;
-      el.addEventListener('input', reload);
-    });
-    const resetBtn = document.getElementById('resetFilters');
-    if(resetBtn){
-      resetBtn.addEventListener('click', function(){
-        ['year','month','week','day','type','category','q'].forEach(id=>{
-          const el = document.getElementById(id);
-          if(!el) return;
-          if(el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
-        });
-        reload();
-      });
-    }
   }
   init();
 });

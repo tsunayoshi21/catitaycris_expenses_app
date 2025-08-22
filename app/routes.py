@@ -63,37 +63,44 @@ def transactions_page():
 
 
 def _parse_date_filters(args):
-    """Devuelve (start_utc, end_utc) o (None, None) según filtros year/month/week/day."""
-    try:
-        day_str = args.get('day')
-        year = args.get('year', type=int)
-        month = args.get('month', type=int)
-        week = args.get('week', type=int)
+    """Devuelve (start_utc, end_utc) o (None, None) según filtros.
 
-        if day_str:
-            d = datetime.fromisoformat(day_str).date()
-            start = datetime.combine(d, time.min, tzinfo=timezone.utc)
-            end = start + timedelta(days=1)
+    Soporta dos modos:
+    - dateMode=ym: usa year y month (month vacío => todo el año).
+    - dateMode=range: usa start y end (YYYY-MM-DD). Si faltan, no filtra.
+    """
+    try:
+        mode = args.get('dateMode', default='range')
+        if mode == 'range':
+            start_str = args.get('start')
+            end_str = args.get('end')
+            if not start_str or not end_str:
+                return None, None
+            d_start = datetime.fromisoformat(start_str).date()
+            d_end = datetime.fromisoformat(end_str).date()
+            if d_end < d_start:
+                d_start, d_end = d_end, d_start
+            start = datetime.combine(d_start, time.min, tzinfo=timezone.utc)
+            end = datetime.combine(d_end + timedelta(days=1), time.min, tzinfo=timezone.utc)
             return start, end
-        if year and week:
-            # ISO week (Mon-Sun)
-            d = date.fromisocalendar(year, week, 1)
-            start = datetime.combine(d, time.min, tzinfo=timezone.utc)
-            end = start + timedelta(days=7)
-            return start, end
-        if year and month:
-            d = date(year, month, 1)
-            if month == 12:
-                d2 = date(year + 1, 1, 1)
+        else:
+            # ym mode
+            year = args.get('year', type=int)
+            month_raw = args.get('month')
+            month = int(month_raw) if (month_raw not in (None, '')) else None
+            if not year:
+                return None, None
+            if month:
+                d = date(year, month, 1)
+                d2 = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+                start = datetime.combine(d, time.min, tzinfo=timezone.utc)
+                end = datetime.combine(d2, time.min, tzinfo=timezone.utc)
+                return start, end
             else:
-                d2 = date(year, month + 1, 1)
-            start = datetime.combine(d, time.min, tzinfo=timezone.utc)
-            end = datetime.combine(d2, time.min, tzinfo=timezone.utc)
-            return start, end
-        if year:
-            start = datetime(year, 1, 1, tzinfo=timezone.utc)
-            end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
-            return start, end
+                # Todo el año
+                start = datetime(year, 1, 1, tzinfo=timezone.utc)
+                end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+                return start, end
         return None, None
     except Exception as e:
         logger.debug('Error parseando filtros de fecha: %s', e)
@@ -106,20 +113,21 @@ def api_transactions():
     # Filtros
     q = (request.args.get('q') or '').strip().lower()
     category = (request.args.get('category') or '').strip().lower()
-    ttype = request.args.get('type')
+    # Permitir múltiples 'type' en query: ?type=debito&type=credito
+    ttypes = [t for t in request.args.getlist('type') if t]
 
     start, end = _parse_date_filters(request.args)
 
     logger.info(
-        "Transacciones de usuario %s - Filtros: q=%s, category=%s, type=%s, start=%s, end=%s",
-        current_user.id, q, category, ttype, start, end,
+        "Transacciones de usuario %s - Filtros: q=%s, category=%s, types=%s, start=%s, end=%s",
+        current_user.id, q, category, ttypes, start, end,
     )
 
     txs = DatabaseManager.get_transactions_for_user(
         user_id=current_user.id,
         q=q,
         category=category,
-        ttype=ttype,
+        ttypes=ttypes if ttypes else None,
         start=start,
         end=end,
         limit=2000,
