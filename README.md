@@ -6,9 +6,9 @@ Our app is built with Flask, SQLite, and other modern Python tools. It’s desig
 
 Please note the app is still under active development (WIP) 🚧. We’re constantly improving it and adding new features. Made with ❤️ for anyone who wants to take charge of their financial life!
 
-## Running the app locally
+### Running the app locally
 
-In order to run the application locally, you can follow these steps. Once in WSL/Ubuntu go to the project location and create and activate the virtual environment, install dependencies, and you're ready to go run the app.
+In order to run the application locally, you can follow these steps. Once in WSL/Ubuntu terminal go to the project location and create and activate the virtual environment, install dependencies, and you're ready to go run the app.
 
 ```bash
 /usr/bin/python3 -m venv .venv
