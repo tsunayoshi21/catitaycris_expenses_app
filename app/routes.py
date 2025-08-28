@@ -1,7 +1,6 @@
 from flask import Blueprint, jsonify, render_template, request, redirect, url_for, flash, session
 from flask_login import login_user, logout_user, login_required, current_user
-from .models import Transaction, User
-from .services.database import db
+from .services.database import DatabaseManager
 import logging
 from datetime import datetime, date, time, timedelta, timezone
 from urllib.parse import urlparse, urljoin
@@ -38,7 +37,7 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
-        user = User.query.filter_by(username=username).first()
+        user = DatabaseManager.get_user_by_username(username)
         if user and user.check_password(password):
             session.clear()  # previene fijación de sesión
             login_user(user)
@@ -64,37 +63,44 @@ def transactions_page():
 
 
 def _parse_date_filters(args):
-    """Devuelve (start_utc, end_utc) o (None, None) según filtros year/month/week/day."""
-    try:
-        day_str = args.get('day')
-        year = args.get('year', type=int)
-        month = args.get('month', type=int)
-        week = args.get('week', type=int)
+    """Devuelve (start_utc, end_utc) o (None, None) según filtros.
 
-        if day_str:
-            d = datetime.fromisoformat(day_str).date()
-            start = datetime.combine(d, time.min, tzinfo=timezone.utc)
-            end = start + timedelta(days=1)
+    Soporta dos modos:
+    - dateMode=ym: usa year y month (month vacío => todo el año).
+    - dateMode=range: usa start y end (YYYY-MM-DD). Si faltan, no filtra.
+    """
+    try:
+        mode = args.get('dateMode', default='range')
+        if mode == 'range':
+            start_str = args.get('start')
+            end_str = args.get('end')
+            if not start_str or not end_str:
+                return None, None
+            d_start = datetime.fromisoformat(start_str).date()
+            d_end = datetime.fromisoformat(end_str).date()
+            if d_end < d_start:
+                d_start, d_end = d_end, d_start
+            start = datetime.combine(d_start, time.min, tzinfo=timezone.utc)
+            end = datetime.combine(d_end + timedelta(days=1), time.min, tzinfo=timezone.utc)
             return start, end
-        if year and week:
-            # ISO week (Mon-Sun)
-            d = date.fromisocalendar(year, week, 1)
-            start = datetime.combine(d, time.min, tzinfo=timezone.utc)
-            end = start + timedelta(days=7)
-            return start, end
-        if year and month:
-            d = date(year, month, 1)
-            if month == 12:
-                d2 = date(year + 1, 1, 1)
+        else:
+            # ym mode
+            year = args.get('year', type=int)
+            month_raw = args.get('month')
+            month = int(month_raw) if (month_raw not in (None, '')) else None
+            if not year:
+                return None, None
+            if month:
+                d = date(year, month, 1)
+                d2 = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+                start = datetime.combine(d, time.min, tzinfo=timezone.utc)
+                end = datetime.combine(d2, time.min, tzinfo=timezone.utc)
+                return start, end
             else:
-                d2 = date(year, month + 1, 1)
-            start = datetime.combine(d, time.min, tzinfo=timezone.utc)
-            end = datetime.combine(d2, time.min, tzinfo=timezone.utc)
-            return start, end
-        if year:
-            start = datetime(year, 1, 1, tzinfo=timezone.utc)
-            end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
-            return start, end
+                # Todo el año
+                start = datetime(year, 1, 1, tzinfo=timezone.utc)
+                end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+                return start, end
         return None, None
     except Exception as e:
         logger.debug('Error parseando filtros de fecha: %s', e)
@@ -107,26 +113,25 @@ def api_transactions():
     # Filtros
     q = (request.args.get('q') or '').strip().lower()
     category = (request.args.get('category') or '').strip().lower()
-    ttype = request.args.get('type')
+    # Permitir múltiples 'type' en query: ?type=debito&type=credito
+    ttypes = [t for t in request.args.getlist('type') if t]
 
     start, end = _parse_date_filters(request.args)
 
-    query = Transaction.query.filter_by(user_id=current_user.id)
+    logger.info(
+        "Transacciones de usuario %s - Filtros: q=%s, category=%s, types=%s, start=%s, end=%s",
+        current_user.id, q, category, ttypes, start, end,
+    )
 
-    if start and end:
-        query = query.filter(Transaction.date >= start, Transaction.date < end)
-    if category:
-        query = query.filter(db.func.lower(Transaction.category).contains(category))
-    if ttype:
-        query = query.filter(Transaction.type == ttype)
-
-    txs = query.order_by(Transaction.date.desc()).limit(2000).all()
-
-    if q:
-        def match_q(t: Transaction) -> bool:
-            blob = f"{t.merchant or ''} {t.description or ''} {t.category or ''} {t.type or ''}".lower()
-            return q in blob
-        txs = [t for t in txs if match_q(t)]
+    txs = DatabaseManager.get_transactions_for_user(
+        user_id=current_user.id,
+        q=q,
+        category=category,
+        ttypes=ttypes if ttypes else None,
+        start=start,
+        end=end,
+        limit=2000,
+    )
 
     return jsonify([t.to_dict() for t in txs])
 
@@ -139,15 +144,17 @@ def api_update_transaction():
     if not tx_id:
         return jsonify({'ok': False, 'error': 'id requerido'}), 400
 
-    tx = Transaction.query.filter_by(id=tx_id, user_id=current_user.id).first()
+    description = data.get('description')
+    category = data.get('category')
+
+    tx = DatabaseManager.update_transaction_for_user(
+        user_id=current_user.id,
+        transaction_id=tx_id,
+        description=description,
+        category=category,
+    )
+
     if not tx:
         return jsonify({'ok': False, 'error': 'no encontrado'}), 404
 
-    # Campos editables
-    if 'description' in data:
-        tx.description = (data['description'] or '').strip() or None
-    if 'category' in data:
-        tx.category = (data['category'] or '').strip() or None
-
-    db.session.commit()
     return jsonify({'ok': True, 'transaction': tx.to_dict()})

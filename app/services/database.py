@@ -81,3 +81,80 @@ class DatabaseManager:
             tx.category = category
             db.session.commit()
         return tx
+
+    # --- Nuevos métodos para centralizar lógica usada en routes.py ---
+    @staticmethod
+    def get_user_by_username(username: str):
+        """Obtiene un usuario por su nombre de usuario.
+
+        Args:
+            username: Nombre de usuario.
+        Returns:
+            Instancia de User o None si no existe.
+        """
+        from ..models import User
+        return User.query.filter_by(username=username).first()
+
+    @staticmethod
+    def get_transactions_for_user(user_id: int, q: str = '', category: str = '', ttypes=None,
+                                  start=None, end=None, limit: int = 2000):
+        """Obtiene transacciones filtradas para un usuario.
+
+        Aplica filtros por rango de fechas, categoría (case-insensitive), tipos (multi)
+        y ordena por fecha descendente. El filtro de búsqueda libre `q` se aplica
+        en memoria para mantener compatibilidad entre motores (SQLite/Postgres).
+
+        Args:
+            user_id: ID del usuario propietario de las transacciones.
+            q: Texto de búsqueda libre (opcional, minúsculas recomendado).
+            category: Categoría a buscar (case-insensitive).
+            ttypes: Lista de tipos de transacción (p.ej. ['debito','credito']). Si None, no filtra por tipo.
+            start: datetime de inicio (UTC) inclusive.
+            end: datetime de término (UTC) exclusivo.
+            limit: Límite de filas a retornar.
+        Returns:
+            Lista de instancias Transaction.
+        """
+        from ..models import Transaction
+
+        query = Transaction.query.filter_by(user_id=user_id)
+        if start and end:
+            query = query.filter(Transaction.date >= start, Transaction.date < end)
+        if category:
+            query = query.filter(db.func.lower(Transaction.category).contains(category))
+        if ttypes:
+            query = query.filter(Transaction.type.in_(ttypes))
+
+        txs = query.order_by(Transaction.date.desc()).limit(limit).all()
+
+        if q:
+            q_norm = (q or '').strip().lower()
+            def match_q(t):
+                blob = f"{t.merchant or ''} {t.description or ''} {t.category or ''} {t.type or ''}".lower()
+                return q_norm in blob
+            txs = [t for t in txs if match_q(t)]
+        return txs
+
+    @staticmethod
+    def update_transaction_for_user(user_id: int, transaction_id: int, description=None, category=None):
+        """Actualiza una transacción si pertenece al usuario dado.
+
+        Args:
+            user_id: ID del usuario que posee la transacción.
+            transaction_id: ID de la transacción a actualizar.
+            description: Nueva descripción (puede ser None o cadena vacía).
+            category: Nueva categoría (puede ser None o cadena vacía).
+        Returns:
+            La instancia actualizada de Transaction o None si no se encontró o no
+            pertenece al usuario.
+        """
+        from ..models import Transaction
+        tx = Transaction.query.filter_by(id=transaction_id, user_id=user_id).first()
+        if not tx:
+            return None
+        if description is not None:
+            tx.description = (description or '').strip() or None
+        if category is not None:
+            tx.category = (category or '').strip() or None
+        db.session.commit()
+        return tx

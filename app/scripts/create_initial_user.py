@@ -29,7 +29,7 @@ try:
 except ModuleNotFoundError as e:
     raise SystemExit(f"No se pudo importar main.py. Ejecuta el script desde la raíz del proyecto o usa: python -m app.scripts.create_initial_user\nDetalle: {e}")
 
-from app.database import db
+from app.services.database import db
 from app.models import Account, User
 
 
@@ -56,9 +56,9 @@ def main():
 
     app = create_app(start_services=False)
     with app.app_context():
-        if Account.query.first():
-            print('Ya existe una cuenta. Abortando para evitar duplicados.')
-            return
+        # if Account.query.first():
+        #     print('Ya existe una cuenta. Abortando para evitar duplicados.')
+        #     return
         acc = Account(imap_host=args.imap_host)
         acc.set_imap_credentials(imap_user, imap_password)
         user = User(username=username, account=acc, chat_id=args.chat_id)

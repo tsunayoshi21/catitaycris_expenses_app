@@ -11,44 +11,7 @@
 {% endblock %}
 
 {% block content %}
-  <div class="row g-3 align-items-end mb-3">
-    <div class="col-6 col-md-2">
-      <label class="form-label">Año</label>
-      <input id="year" type="number" class="form-control" placeholder="YYYY">
-    </div>
-    <div class="col-6 col-md-2">
-      <label class="form-label">Mes</label>
-      <input id="month" type="number" class="form-control" placeholder="1-12">
-    </div>
-    <div class="col-6 col-md-2">
-      <label class="form-label">Semana ISO</label>
-      <input id="week" type="number" class="form-control" placeholder="1-53">
-    </div>
-    <div class="col-6 col-md-3">
-      <label class="form-label">Día</label>
-      <input id="day" type="date" class="form-control">
-    </div>
-    <div class="col-6 col-md-1">
-      <label class="form-label">Tipo</label>
-      <select id="type" class="form-select">
-        <option value="">Todos</option>
-        <option value="debito">Débito</option>
-        <option value="credito">Crédito</option>
-        <option value="transferencia">Transferencia</option>
-      </select>
-    </div>
-    <div class="col-6 col-md-2">
-      <label class="form-label">Categoría</label>
-      <input id="category" class="form-control" placeholder="todas">
-    </div>
-    <div class="col-12 col-md-3">
-      <label class="form-label">Buscar</label>
-      <input id="q" class="form-control" placeholder="texto libre">
-    </div>
-    <div class="col-12 col-md-2 ms-auto">
-      <button id="resetFilters" class="btn btn-secondary w-100">Reset filtros</button>
-    </div>
-  </div>
+  {% include 'partials/filters.html' %}
 
   <!-- Resumen -->
   <div class="row g-3 mb-4">
@@ -100,87 +63,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-function hashString(s){
-  let h = 0; for(let i=0;i<s.length;i++){ h = ((h<<5)-h) + s.charCodeAt(i); h|=0; }
-  return h;
-}
-function colorForCategory(cat){
-  const hue = Math.abs(hashString(cat)) % 360;
-  return `hsl(${hue} 70% 55%)`;
-}
-async function fetchTx(){
-  const p = new URLSearchParams();
-  const y = document.getElementById('year').value; if(y) p.set('year', y);
-  const m = document.getElementById('month').value; if(m) p.set('month', m);
-  const w = document.getElementById('week').value; if(w) p.set('week', w);
-  const d = document.getElementById('day').value; if(d) p.set('day', d);
-  const t = document.getElementById('type').value; if(t) p.set('type', t);
-  const c = document.getElementById('category').value; if(c) p.set('category', c);
-  const q = document.getElementById('q').value; if(q) p.set('q', q);
-  const r = await fetch('/api/transactions?'+p.toString());
-  if(r.status === 401){ window.location = '/login'; return []; }
-  return await r.json();
-}
-function peso(v){
-  return new Intl.NumberFormat('es-CL', {style:'currency', currency:'CLP', maximumFractionDigits:0}).format(v);
-}
-let barChart; let pieChart;
-function updateLegend(labels, colors, values){
-  const el = document.getElementById('legend'); if(!el) return;
-  el.innerHTML = '';
-  labels.forEach((lab, i)=>{
-    const item = document.createElement('div');
-    item.className = 'd-flex align-items-center justify-content-between border rounded px-2 py-1';
-    const left = document.createElement('div'); left.className = 'd-flex align-items-center gap-2';
-    const swatch = document.createElement('span'); swatch.style.cssText = `display:inline-block;width:12px;height:12px;border-radius:50%;background:${colors[i]}`;
-    const name = document.createElement('span'); name.textContent = lab;
-    const val = document.createElement('span'); val.textContent = peso(values[i]);
-    left.appendChild(swatch); left.appendChild(name);
-    item.appendChild(left); item.appendChild(val);
-    el.appendChild(item);
-  });
-}
-async function render(){
-  const data = await fetchTx();
-  const total = data.reduce((s,t)=> s + (t.amount||0), 0);
-  document.getElementById('total').textContent = peso(total);
-  const byCat = {};
-  data.forEach(t=>{ const c=(t.category||'otros').toLowerCase(); byCat[c]=(byCat[c]||0)+(t.amount||0); });
-  const labels = Object.keys(byCat);
-  const values = labels.map(k=> byCat[k]);
-  const colors = labels.map(cat=> colorForCategory(cat));
-  // Bar chart
-  const barCfg = {
-    type:'bar',
-    data:{ labels, datasets:[{ label:'CLP', data: values, backgroundColor: colors }]},
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } } }
-  };
-  // Pie chart
-  const pieCfg = {
-    type:'doughnut',
-    data:{ labels, datasets:[{ data: values, backgroundColor: colors }]},
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } } }
-  };
-  const barCtx = document.getElementById('catChart').getContext('2d');
-  const pieCtx = document.getElementById('pieChart').getContext('2d');
-  if(barChart){ barChart.destroy(); }
-  if(pieChart){ pieChart.destroy(); }
-  barChart = new Chart(barCtx, barCfg);
-  pieChart = new Chart(pieCtx, pieCfg);
-  updateLegend(labels, colors, values);
-}
-['year','month','week','day','type','category','q'].forEach(id=> document.getElementById(id).addEventListener('input', render));
-
-document.getElementById('resetFilters').addEventListener('click', function(){
-  ['year','month','week','day','type','category','q'].forEach(id=>{
-    const el = document.getElementById(id);
-    if(!el) return;
-    if(el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
-  });
-  render();
-});
-
-render();
-</script>
+<script src="{{ url_for('static', filename='js/filters.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}" defer></script>
 {% endblock %}

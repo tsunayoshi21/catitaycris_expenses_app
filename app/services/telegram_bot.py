@@ -1,7 +1,14 @@
+"""Bot de Telegram para notificar y registrar descripciones de transacciones.
+
+Este módulo inicializa el bot, envía notificaciones a los usuarios y procesa
+sus respuestas usando respuestas por referencia (reply) al mensaje del bot que
+incluye el identificador de la transacción (#<id>).
+"""
+
 import os
 from threading import Thread
 from queue import Queue, Empty
-from telegram import Update
+from telegram import Update, ForceReply
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from ..config import Config
 from ..models import User
@@ -9,15 +16,28 @@ from .database import DatabaseManager
 from .llm import categorize
 import asyncio
 import logging
+import re
 
 # Logger para este módulo
 logger = logging.getLogger(__name__)
 
-pending_questions = {}  # chat_id -> transaction_id
 notification_queue = Queue()  # Queue para envío thread-safe
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Comando /start del bot.
+
+    Verifica que exista contexto de Flask, valida si el usuario está
+    registrado por `chat_id` y confirma la activación del bot. Si no está
+    registrado, informa al usuario que contacte al administrador.
+
+    Args:
+        update: Actualización recibida por el bot (mensaje /start).
+        context: Contexto de ejecución del handler de Telegram.
+
+    Returns:
+        None. Responde al usuario según el estado de registro.
+    """
     flask_app = context.application.bot_data.get('flask_app')
     if not flask_app:
         return
@@ -37,6 +57,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja mensajes de texto enviados por el usuario.
+
+    Si el mensaje es una respuesta (reply) al mensaje del bot que contiene un
+    identificador de transacción (#<id>), categoriza y guarda la descripción
+    para esa transacción. En caso contrario, guía al usuario sobre cómo
+    responder correctamente.
+
+    Args:
+        update: Actualización con el mensaje del usuario.
+        context: Contexto de ejecución del handler de Telegram.
+
+    Returns:
+        None. Envía respuestas informativas al usuario.
+    """
     flask_app = context.application.bot_data.get('flask_app')
     if not flask_app:
         return
@@ -62,45 +96,74 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         text = update.message.text.strip()
         
-        if chat_id in pending_questions:
-            # Usuario respondió sobre una transacción pendiente
-            tx_id = pending_questions.pop(chat_id)
-            logger.info('💳 Procesando respuesta para transacción tx_id=%s del usuario=%s', 
-                                   tx_id, user.username)
+        # Nuevo flujo: usar reply_to_message para identificar la transacción (#<id>)
+        replied = getattr(update.message, 'reply_to_message', None)
+        if replied and replied.from_user and replied.from_user.is_bot:
+            original_text = replied.text or ''
+            m = re.search(r'#(\d+)', original_text)
+            if not m:
+                logger.warning('❌ No se encontró tx_id en el mensaje referenciado por chat_id=%s', chat_id)
+                await update.message.reply_text('❌ No pude identificar la transacción. Responde al mensaje del bot que contiene el ID (#123).')
+                return
+            tx_id = int(m.group(1))
+            logger.info('💳 Procesando respuesta para transacción tx_id=%s del usuario=%s', tx_id, user.username)
             
             # Categorizar respuesta del usuario
             logger.debug('🤖 Categorizando respuesta: "%s"', text)
             category = categorize(text)
             logger.debug('📁 Categoría asignada: "%s"', category)
             
-            # Actualizar transacción
+            # Actualizar transacción (la validación de pertenencia debería ocurrir en capa de DB)
             tx = DatabaseManager.update_transaction_description(tx_id, text, category)
             if tx:
-                logger.info('✅ Transacción tx_id=%s actualizada - descripción="%s" categoría="%s"', 
-                                       tx_id, text, category)
+                logger.info('✅ Transacción tx_id=%s actualizada - descripción="%s" categoría="%s"', tx_id, text, category)
                 await update.message.reply_text(
-                    f'✅ Transacción guardada:\n'
+                    f'✅ Transacción #{tx_id} guardada:\n'
                     f'💬 Descripción: {text}\n'
                     f'📁 Categoría: {category}'
                 )
             else:
-                logger.error('❌ Error: transacción tx_id=%s no encontrada en DB', tx_id)
-                await update.message.reply_text('❌ Error: transacción no encontrada.')
-        else:
-            # Mensaje sin contexto
-            logger.debug('💡 No hay transacciones pendientes para chat_id=%s', chat_id)
-            await update.message.reply_text(
-                f'💡 No hay transacciones pendientes.'
-            )
+                logger.error('❌ Error: transacción tx_id=%s no encontrada en DB o no pertenece al usuario', tx_id)
+                await update.message.reply_text('❌ Error: transacción no encontrada o no autorizada.')
+            return
+        
+        # Si no es una respuesta a un mensaje del bot con #id, guiar al usuario
+        logger.debug('💡 Mensaje sin referencia válida a transacción para chat_id=%s', chat_id)
+        await update.message.reply_text(
+            '💡 Para registrar una descripción, responde directamente al mensaje de la transacción que contiene el ID (por ejemplo, #123).'
+        )
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+    """Handler global de errores del bot.
+
+    Registra con nivel de excepción cualquier error producido durante el
+    procesamiento de una actualización.
+
+    Args:
+        update: Objeto de actualización asociado al error (puede ser None).
+        context: Contexto con información del error (`context.error`).
+
+    Returns:
+        None.
+    """
     logger.exception('Error en Telegram bot: update=%s error=%s', 
                     getattr(update, 'update_id', None), context.error)
 
 
 async def process_notification_queue(application):
-    """Procesa la cola de notificaciones de forma asíncrona"""
+    """Procesa la cola de notificaciones de forma asíncrona y continua.
+
+    Extrae mensajes de `notification_queue` y los envía al usuario con
+    `ForceReply` para facilitar la respuesta directa al mensaje con el
+    identificador de la transacción.
+
+    Args:
+        application: Instancia de `Application` de python-telegram-bot.
+
+    Returns:
+        None. Se ejecuta en bucle infinito.
+    """
     while True:
         try:
             # Esperar por notificaciones en la cola
@@ -116,18 +179,16 @@ async def process_notification_queue(application):
             
             logger.debug("📤 Procesando notificación para chat_id=%s tx_id=%s", chat_id, transaction_id)
             
-            # Guardar transacción como pendiente
-            pending_questions[chat_id] = transaction_id
-            logger.debug("⏳ Transacción tx_id=%s marcada como pendiente para chat_id=%s", transaction_id, chat_id)
-            
-            # Enviar mensaje
+            # Enviar mensaje con ForceReply para facilitar la respuesta directa
             try:
-                await application.bot.send_message(chat_id=chat_id, text=message)
+                await application.bot.send_message(
+                    chat_id=chat_id,
+                    text=message + "\n\n✍️ Responde a ESTE mensaje con la descripción para la transacción #" + str(transaction_id),
+                    reply_markup=ForceReply(selective=True, input_field_placeholder=f"Descripción para #" + str(transaction_id))
+                )
                 logger.info("✅ Notificación enviada exitosamente a chat_id=%s", chat_id)
             except Exception as e:
                 logger.error("❌ Error enviando mensaje a chat_id=%s: %s", chat_id, e)
-                # Remover de pendientes si falló el envío
-                pending_questions.pop(chat_id, None)
                 
         except Exception as e:
             logger.error("❌ Error procesando cola de notificaciones: %s", e)
@@ -135,7 +196,19 @@ async def process_notification_queue(application):
 
 
 def notify_new_transaction(app, transaction):
-    """Notifica al usuario sobre una nueva transacción para que la describa"""
+    """Encola una notificación de nueva transacción para un usuario.
+
+    Construye un mensaje con la información de la transacción e inserta un
+    registro en `notification_queue` para su envío por el worker asíncrono.
+
+    Args:
+        app: Instancia de Flask para abrir un contexto de aplicación.
+        transaction: Objeto de transacción con atributos `id`, `date`, `amount`,
+            `merchant`, `type`, `category` y relación `user` con `chat_id`.
+
+    Returns:
+        None. Si el usuario no tiene `chat_id`, no se encola ninguna notificación.
+    """
     with app.app_context():
         user = transaction.user
         if not user.chat_id:
@@ -145,9 +218,9 @@ def notify_new_transaction(app, transaction):
         logger.info('📲 Preparando notificación para usuario=%s chat_id=%s tx_id=%s', 
                        user.username, user.chat_id, transaction.id)
         
-        # Crear mensaje informativo
+        # Crear mensaje informativo incluyendo #<id>
         msg = (
-            f"💳 Nueva transacción detectada:\n\n"
+            f"💳 Nueva transacción detectada (#"+str(transaction.id)+"):\n\n"
             f"📅 Fecha: {transaction.date.strftime('%d/%m/%Y %H:%M')}\n"
             f"💰 Monto: ${transaction.amount:,.0f}\n"
             f"🏪 Comercio: {transaction.merchant or 'No especificado'}\n"
@@ -176,7 +249,18 @@ def notify_new_transaction(app, transaction):
 
 
 def build_and_run_bot(app):
-    """Inicializa y ejecuta el bot de Telegram"""
+    """Inicializa el bot de Telegram y lo ejecuta en un hilo daemon.
+
+    Crea la aplicación de Telegram, registra handlers, inicia el polling y
+    arranca una tarea asíncrona para procesar la cola de notificaciones.
+
+    Args:
+        app: Instancia de Flask para compartir contexto con el bot.
+
+    Returns:
+        Thread | None: Hilo daemon en el que corre el bot, o None si no hay
+        `TELEGRAM_BOT_TOKEN` configurado.
+    """
     token = Config.TELEGRAM_BOT_TOKEN
     if not token:
         logger.warning('❌ TELEGRAM_BOT_TOKEN no configurado')
@@ -185,8 +269,21 @@ def build_and_run_bot(app):
     logger.info('🚀 Configurando bot de Telegram...')
     
     def _run_bot():
-        """Ejecuta el bot en un hilo separado"""
+        """Ejecuta el ciclo de vida del bot en un hilo dedicado.
+
+        Inicializa la aplicación asíncrona, configura handlers, arranca el
+        polling y gestiona el apagado ordenado del bot.
+
+        Returns:
+            None.
+        """
         async def _async_main():
+            """Rutina asíncrona principal del bot.
+
+            Crea `Application`, registra handlers, inicia polling y lanza la
+            tarea de procesamiento de notificaciones hasta que el proceso
+            finalice.
+            """
             logger.info('🔧 Inicializando aplicación Telegram...')
             application = ApplicationBuilder().token(token).build()
             application.bot_data['flask_app'] = app
