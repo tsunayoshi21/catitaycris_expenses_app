@@ -2,13 +2,14 @@ import os
 import json
 import requests
 import logging
-from document_utils import load_prompt
+from .document_utils import load_prompt
 
 # Logger para este módulo
 logger = logging.getLogger(__name__)
 
-SYSTEM_PARSE = load_prompt("system_parse.txt")
-SYSTEM_CATEGORIZE = load_prompt("system_categorize.txt")
+SYSTEM_PARSE = load_prompt("parse_prompt.txt")
+SYSTEM_CATEGORIZE = load_prompt("categorize_prompt.txt")
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 def _api_base() -> str:
     return os.getenv('OPENAI_BASE_URL', 'https://api.openai.com')
