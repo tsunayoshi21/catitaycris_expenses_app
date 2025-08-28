@@ -12,3 +12,4 @@ openai==1.75
 pydantic>=2.10,<3
 pydantic-settings>=2.5.2
 pydantic-ai==0.1.10
+beautifulsoup4==4.13.5
