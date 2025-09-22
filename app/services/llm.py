@@ -1,76 +1,84 @@
 import os
-import json
-import requests
 import logging
+from typing import Type
+from pydantic import BaseModel
+from pydantic_ai import Agent
+from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.settings import ModelSettings
 from .document_utils import load_prompt
+from .schemas import ParsedEmail, CategorizeOutput
 
-# Logger para este módulo
 logger = logging.getLogger(__name__)
 
-SYSTEM_PARSE = load_prompt("parse_prompt.txt")
-SYSTEM_CATEGORIZE = load_prompt("categorize_prompt.txt")
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+OPENAI_API_KEY    = os.getenv('OPENAI_API_KEY')
+OPENAI_MODEL      = os.getenv('OPENAI_MODEL')
 
-def _api_base() -> str:
-    return os.getenv('OPENAI_BASE_URL', 'https://api.openai.com')
+def llm_agent(output_schema: Type[BaseModel], system_prompt: str, model: str = OPENAI_MODEL, temp: float = 0.5) -> Agent:
+    """
+    Create and return a PydanticAI Agent with specified config.
+    Current support for OpenAI models only.
+    
+    Args:
+        output_model: The Pydantic schema to structure the output
+        system_prompt: The system prompt to guide the model
+        model_name: Optional, specific model to use
+        temperature: Optional, temperature setting for the model
+    
+    Returns:
+        Agent: A configured PydanticAI Agent
+    """
+    model_name  = model
+    temperature = temp
+    model       = OpenAIModel(model_name)
+    model_settings: ModelSettings = {"temperature": temperature}
+        
+    if not OPENAI_API_KEY:
+        raise EnvironmentError(
+            "OPENAI_API_KEY environment variable is required, but not set."
+        )
 
-def _api_key() -> str | None:
-    return os.getenv('OPENAI_API_KEY')
+    model = OpenAIModel(model_name)
+    model_settings = {"temperature": temperature}
 
-def _chat_completions(payload: dict) -> dict | None:
-    key = _api_key()
-    if not key:
-        return None
-    url = f"{_api_base().rstrip('/')}/v1/chat/completions"
-    headers = {
-        'Authorization': f'Bearer {key}',
-        'Content-Type': 'application/json',
-    }
+    agent = Agent(
+        model=model,
+        output_type=output_schema,
+        system_prompt=system_prompt,
+        model_settings=model_settings,
+        retries=0
+    )
+    
+    return agent
+
+async def parse_email(subject: str, body: str) -> dict:
+    """
+    Parse email content to extract transaction details using LLM
+    """
+    system_prompt = load_prompt("parse_system_prompt.txt")
+    user_prompt = load_prompt("parse_user_prompt.txt").format(asunto=subject, cuerpo=body)
+    
+    agent = llm_agent(ParsedEmail, system_prompt)
+    
     try:
-        resp = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
-        if resp.status_code >= 400:
-            return None
-        return resp.json()
-    except Exception:
-        return None
-
-def parse_email(subject: str, body: str) -> dict:
-    prompt = f"Asunto: {subject}\n\nCuerpo:\n{body}"
-    payload = {
-        'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
-        'messages': [
-            {"role": "system", "content": SYSTEM_PARSE},
-            {"role": "user", "content": prompt},
-        ],
-        'temperature': 0.0,
-        'response_format': {"type": "json_object"},
-    }
-    data = _chat_completions(payload)
-    if not data:
+        result = await agent.run(user_prompt)
+        return result.output.dict() if result and result.output else {}
+    
+    except Exception as e:
+        logger.error(f"Error en parse_email(): {e}")
         return {}
-    try:
-        content = data['choices'][0]['message']['content']
-        return json.loads(content)
-    except Exception:
-        return {}
 
-def categorize(description: str, merchant: str | None = None) -> str:
-    base = description or ''
-    if merchant:
-        base += f" | comercio: {merchant}"
-    payload = {
-        'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
-        'messages': [
-            {"role": "system", "content": SYSTEM_CATEGORIZE},
-            {"role": "user", "content": base[:500]},
-        ],
-        'temperature': 0.0,
-    }
-    data = _chat_completions(payload)
-    if not data:
-        return 'otros'
+async def categorize(description: str, merchant: str | None = None) -> str:
+    """
+    Categorize an expense based on its description and merchant information
+    """
+    system_prompt = load_prompt("categorize_system_prompt.txt")
+    user_prompt = load_prompt("categorize_user_prompt.txt").format(descripcion=description, merchant=merchant or '')
+
+    agent = llm_agent(CategorizeOutput, system_prompt)
+
     try:
-        content = data['choices'][0]['message']['content'].strip().lower()
-        return content.split('\n')[0][:50]
-    except Exception:
+        result = await agent.run(user_prompt)
+        return result.output.categoria.strip().lower() if result and result.output and result.output.categoria else 'otros'
+    except Exception as e:
+        logger.error(f"Error en categorize(): {e}")
         return 'otros'
