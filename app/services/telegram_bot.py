@@ -110,7 +110,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # Categorizar respuesta del usuario
             logger.debug('🤖 Categorizando respuesta: "%s"', text)
-            category = categorize(text)
+            category = await categorize(text)
             logger.debug('📁 Categoría asignada: "%s"', category)
             
             # Actualizar transacción (la validación de pertenencia debería ocurrir en capa de DB)

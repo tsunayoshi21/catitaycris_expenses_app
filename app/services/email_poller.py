@@ -4,7 +4,7 @@ import email
 import email.utils
 from email.header import decode_header
 import time
-import re
+import asyncio
 from datetime import datetime, timezone
 from ..config import Config
 from .database import DatabaseManager
@@ -340,7 +340,7 @@ class EmailProcessor:
         if self.is_subject_supported(subject):
             logger.debug('Procesando email con asunto: %s', subject)
             logger.debug('Body extraído (primeros 500 chars): %s', body[:500])
-            parsed_data = parse_email(subject, body)
+            parsed_data = asyncio.run(parse_email(subject, body))
             logger.debug('Datos parseados: %s', parsed_data)
             return self._create_email_data(msg, parsed_data)
         else:
