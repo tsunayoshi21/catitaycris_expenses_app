@@ -7,7 +7,3 @@ class ParsedEmail(BaseModel):
     monto: float
     comercio: Optional[str] = None
     fecha_iso: Optional[str] = None
-
-
-class CategorizeOutput(BaseModel):
-    categoria: str

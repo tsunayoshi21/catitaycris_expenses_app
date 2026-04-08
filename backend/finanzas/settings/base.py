@@ -125,6 +125,7 @@ CORS_ALLOW_CREDENTIALS = True
 
 # App-specific
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
+TELEGRAM_BOT_USERNAME = os.getenv('TELEGRAM_BOT_USERNAME', '')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
 APP_ENCRYPTION_KEY = os.environ['APP_ENCRYPTION_KEY']
@@ -133,3 +134,37 @@ IMAP_HOST = os.getenv('IMAP_HOST', '')
 IMAP_PORT = int(os.getenv('IMAP_PORT', '993'))
 IMAP_FOLDER = os.getenv('IMAP_FOLDER', 'INBOX')
 POLL_INTERVAL = int(os.getenv('POLL_INTERVAL', '60'))
+
+# Logging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{asctime} [{levelname}] {name}: {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'services': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'apps': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+}

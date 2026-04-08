@@ -1,5 +1,5 @@
 from django.db import models
-from django.db.models import Sum
+from django.db.models import Q, Sum
 
 
 TRANSACTION_TYPE_CHOICES = [
@@ -31,6 +31,11 @@ class Category(models.Model):
 
     def __str__(self):
         return self.label
+
+    @staticmethod
+    def get_valid_for_user(user_id):
+        """Return categories visible to a user: defaults + user-owned."""
+        return Category.objects.filter(Q(is_default=True) | Q(owner_id=user_id))
 
 
 class Person(models.Model):
@@ -103,13 +108,19 @@ class ExpenseSplit(models.Model):
 
 class TelegramNotification(models.Model):
     """Outbox pattern -- replaces in-memory Queue, survives container restarts."""
+    MAX_RETRIES = 5
+
     user = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE)
     transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE)
     sent = models.BooleanField(default=False)
     sent_at = models.DateTimeField(null=True, blank=True)
+    failed = models.BooleanField(default=False)
+    retry_count = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True, default='')
+    processing_at = models.DateTimeField(null=True, blank=True, default=None)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         indexes = [
-            models.Index(fields=['sent']),
+            models.Index(fields=['sent', 'failed']),
         ]

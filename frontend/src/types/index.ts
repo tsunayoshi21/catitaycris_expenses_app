@@ -51,6 +51,17 @@ export interface PaginatedResponse<T> {
   results: T[]
 }
 
+export interface UserMe {
+  id: number
+  username: string
+  email: string | null
+  telegram_chat_id: string | null
+  telegram_link_token: string | null
+  telegram_linked: boolean
+  telegram_bot_username: string
+  created_at: string
+}
+
 export interface TransactionFilters {
   start?: string
   end?: string

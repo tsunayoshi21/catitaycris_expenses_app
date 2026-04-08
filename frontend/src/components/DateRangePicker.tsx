@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import { Select } from './ui'
 
 export type FilterParams = { year?: number; month?: number; start?: string; end?: string }
 type Mode = 'month' | 'range'
@@ -15,17 +16,18 @@ const MONTHS = [
 const CURRENT_YEAR = new Date().getFullYear()
 const YEARS = Array.from({ length: CURRENT_YEAR - 2023 }, (_, i) => 2024 + i)
 
-const selectClass = 'border border-surface-300 rounded-input px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-surface-600 dark:bg-surface-800 dark:text-surface-200 dark:focus:ring-primary-400'
+const MONTH_OPTIONS = MONTHS.map((name, i) => ({ value: String(i + 1), label: name }))
+const YEAR_OPTIONS = YEARS.map((y) => ({ value: String(y), label: String(y) }))
+
+const dateInputClass = 'border border-surface-300 dark:border-surface-600 rounded-input px-3 py-2 text-sm bg-white dark:bg-white/[0.06] text-surface-800 dark:text-surface-200 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400'
 
 export default function DateRangePicker({ onFilterChange }: Props) {
-  const now = new Date()
+  const now = useMemo(() => new Date(), [])
   const [mode, setMode] = useState<Mode>('month')
 
-  // Month mode state
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
 
-  // Range mode state
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
 
@@ -72,12 +74,16 @@ export default function DateRangePicker({ onFilterChange }: Props) {
       {/* Stack both modes in the same space so the toggle never shifts */}
       <div className="grid">
         <div className={`col-start-1 row-start-1 flex items-center gap-3 ${mode !== 'month' ? 'invisible' : ''}`}>
-          <select className={selectClass} value={month} onChange={(e) => handleMonthChange(year, +e.target.value)}>
-            {MONTHS.map((name, i) => <option key={i + 1} value={i + 1}>{name}</option>)}
-          </select>
-          <select className={selectClass} value={year} onChange={(e) => handleMonthChange(+e.target.value, month)}>
-            {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
+          <Select
+            options={MONTH_OPTIONS}
+            value={String(month)}
+            onChange={(val) => handleMonthChange(year, +val)}
+          />
+          <Select
+            options={YEAR_OPTIONS}
+            value={String(year)}
+            onChange={(val) => handleMonthChange(+val, month)}
+          />
         </div>
 
         <div className={`col-start-1 row-start-1 flex items-center gap-3 ${mode !== 'range' ? 'invisible' : ''}`}>
@@ -86,14 +92,14 @@ export default function DateRangePicker({ onFilterChange }: Props) {
             type="date"
             value={startDate}
             onChange={(e) => handleStartDate(e.target.value)}
-            className={selectClass}
+            className={dateInputClass}
           />
           <span className="text-sm text-surface-500 dark:text-surface-400">Hasta</span>
           <input
             type="date"
             value={endDate}
             onChange={(e) => handleEndDate(e.target.value)}
-            className={selectClass}
+            className={dateInputClass}
           />
         </div>
       </div>

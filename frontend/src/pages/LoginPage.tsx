@@ -19,7 +19,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const { data } = await axios.post('/api/auth/token/', { username, password })
-      setTokens(data.access, data.refresh, username, data.is_staff)
+      setTokens(data.access, data.refresh, data.username, data.is_staff)
       navigate('/dashboard')
     } catch {
       setError('Credenciales inválidas')
@@ -68,7 +68,7 @@ export default function LoginPage() {
             </Button>
           </form>
           <p className="text-center text-sm text-surface-500 dark:text-surface-400 mt-4">
-            ¿No tenés cuenta?{' '}
+            ¿No tienes cuenta?{' '}
             <Link to="/register" className="text-primary-600 dark:text-primary-400 hover:underline">
               Regístrate
             </Link>

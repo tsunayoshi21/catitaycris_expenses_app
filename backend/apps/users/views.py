@@ -1,5 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.utils import timezone
+from datetime import timedelta
 from rest_framework import status
 from rest_framework.generics import RetrieveAPIView, ListAPIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -33,9 +35,10 @@ class RegisterView(APIView):
         data = serializer.validated_data
 
         with transaction.atomic():
+            yesterday = timezone.now() - timedelta(days=1)
             account = Account(
                 imap_host=data['imap_host'],
-                last_checked=data.get('last_checked'),
+                last_checked=yesterday,
             )
             account.set_imap_credentials(data['imap_user'], data['imap_password'])
             account.save()
@@ -89,6 +92,28 @@ class UserListView(ListAPIView):
         if not self.request.user.is_staff:
             return User.objects.none()
         return User.objects.all().order_by('username')
+
+
+class TelegramGenerateTokenView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        token = request.user.generate_telegram_link_token()
+        return Response({'telegram_link_token': token})
+
+
+class TelegramUnlinkView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        user.telegram_chat_id = None
+        user.telegram_link_token = None
+        user.telegram_link_token_created_at = None
+        user.save(update_fields=[
+            'telegram_chat_id', 'telegram_link_token', 'telegram_link_token_created_at',
+        ])
+        return Response({'detail': 'Telegram desvinculado.'})
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):

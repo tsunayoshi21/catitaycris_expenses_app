@@ -1,15 +1,29 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from django.conf import settings
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
 
 class UserMeSerializer(serializers.ModelSerializer):
+    telegram_bot_username = serializers.SerializerMethodField()
+    telegram_linked = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'telegram_chat_id', 'created_at']
-        read_only_fields = ['id', 'username', 'email', 'telegram_chat_id', 'created_at']
+        fields = [
+            'id', 'username', 'email', 'telegram_chat_id',
+            'telegram_link_token', 'telegram_linked',
+            'telegram_bot_username', 'created_at',
+        ]
+        read_only_fields = fields
+
+    def get_telegram_bot_username(self, obj) -> str:
+        return settings.TELEGRAM_BOT_USERNAME
+
+    def get_telegram_linked(self, obj) -> bool:
+        return bool(obj.telegram_chat_id)
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -18,7 +32,6 @@ class RegisterSerializer(serializers.Serializer):
     imap_host = serializers.CharField(default='imap.gmail.com')
     imap_user = serializers.CharField(write_only=True)
     imap_password = serializers.CharField(write_only=True)
-    last_checked = serializers.DateTimeField(required=False, allow_null=True, default=None)
 
     def validate_username(self, value):
         if User.objects.filter(username=value).exists():
@@ -44,5 +57,6 @@ class UserListSerializer(serializers.ModelSerializer):
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         data = super().validate(attrs)
+        data['username'] = self.user.username
         data['is_staff'] = self.user.is_staff
         return data

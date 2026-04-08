@@ -1,10 +1,8 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import DateRangePicker from './DateRangePicker'
 import type { FilterParams } from './DateRangePicker'
 import { useCategories } from '../hooks/useCategories'
-
-const inputClass = 'border border-surface-300 rounded-input px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 w-full md:w-auto dark:border-surface-600 dark:bg-white/[0.06] dark:text-surface-200 dark:placeholder:text-surface-500 dark:focus:ring-primary-400'
-const selectClass = 'border border-surface-300 rounded-input px-3 py-1.5 text-sm w-full md:w-auto dark:border-surface-600 dark:bg-surface-800 dark:text-surface-200'
+import { Select } from './ui'
 
 export interface Filters {
   year?: number
@@ -21,9 +19,22 @@ interface Props {
   onChange: (filters: Filters) => void
 }
 
+const TYPE_OPTIONS = [
+  { value: '', label: 'Todos los tipos' },
+  { value: 'debito', label: 'Débito' },
+  { value: 'credito', label: 'Crédito' },
+  { value: 'transferencia', label: 'Transferencia' },
+  { value: 'ingreso', label: 'Ingreso' },
+]
+
 export default function FilterBar({ filters, onChange }: Props) {
   const { data: categories } = useCategories()
   const [searchValue, setSearchValue] = useState(filters.search ?? '')
+
+  const categoryOptions = useMemo(() => [
+    { value: '', label: 'Todas las categorías' },
+    ...(categories?.map((cat) => ({ value: cat.name, label: cat.label })) ?? []),
+  ], [categories])
 
   function handleDateChange(params: FilterParams) {
     onChange({
@@ -40,14 +51,6 @@ export default function FilterBar({ filters, onChange }: Props) {
     onChange({ ...filters, search: value || undefined })
   }
 
-  function handleType(value: string) {
-    onChange({ ...filters, type: value || undefined })
-  }
-
-  function handleCategory(value: string) {
-    onChange({ ...filters, category: value || undefined })
-  }
-
   return (
     <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
       <input
@@ -55,29 +58,22 @@ export default function FilterBar({ filters, onChange }: Props) {
         placeholder="Buscar..."
         value={searchValue}
         onChange={(e) => handleSearch(e.target.value)}
-        className={inputClass}
+        className="border border-surface-300 dark:border-surface-600 rounded-input px-3 py-2 text-sm
+          bg-white dark:bg-white/[0.06] text-surface-800 dark:text-surface-200
+          placeholder:text-surface-400 dark:placeholder:text-surface-500
+          focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400
+          w-full md:w-auto"
       />
-      <select
-        className={selectClass}
+      <Select
+        options={TYPE_OPTIONS}
         value={filters.type ?? ''}
-        onChange={(e) => handleType(e.target.value)}
-      >
-        <option value="">Todos los tipos</option>
-        <option value="debito">Débito</option>
-        <option value="credito">Crédito</option>
-        <option value="transferencia">Transferencia</option>
-        <option value="ingreso">Ingreso</option>
-      </select>
-      <select
-        className={selectClass}
+        onChange={(val) => onChange({ ...filters, type: val || undefined })}
+      />
+      <Select
+        options={categoryOptions}
         value={filters.category ?? ''}
-        onChange={(e) => handleCategory(e.target.value)}
-      >
-        <option value="">Todas las categorías</option>
-        {categories?.map((cat) => (
-          <option key={cat.id} value={cat.name}>{cat.label}</option>
-        ))}
-      </select>
+        onChange={(val) => onChange({ ...filters, category: val || undefined })}
+      />
       <DateRangePicker onFilterChange={handleDateChange} />
     </div>
   )

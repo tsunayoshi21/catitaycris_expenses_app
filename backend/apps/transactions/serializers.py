@@ -21,7 +21,7 @@ class TransactionListSerializer(serializers.ModelSerializer):
             'description', 'category_name', 'category', 'split_count',
             'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'net_amount', 'split_count', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'date', 'amount', 'merchant', 'type', 'net_amount', 'split_count', 'created_at', 'updated_at']
 
     def get_split_count(self, obj):
         return obj.splits.count()

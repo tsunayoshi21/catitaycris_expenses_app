@@ -1,3 +1,5 @@
+import re
+
 from django.db.models import Q, Sum, Case, When, DecimalField, Value
 from django.db.models.functions import TruncMonth
 from django.shortcuts import get_object_or_404
@@ -95,12 +97,9 @@ class CategoryViewSet(
     pagination_class = None
 
     def get_queryset(self):
-        return Category.objects.filter(
-            Q(is_default=True) | Q(owner=self.request.user)
-        )
+        return Category.get_valid_for_user(self.request.user.id)
 
     def perform_create(self, serializer):
-        import re
         name = re.sub(r'[^a-z0-9_-]', '_', serializer.validated_data.get('label', '').lower())
         serializer.save(owner=self.request.user, name=name)
 
@@ -138,8 +137,6 @@ class DashboardView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        from datetime import datetime
-
         start_str = request.query_params.get('start')
         end_str = request.query_params.get('end')
         year_str = request.query_params.get('year')

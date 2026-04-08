@@ -10,7 +10,6 @@ export default function RegisterPage() {
   const [imapHost, setImapHost] = useState('imap.gmail.com')
   const [imapUser, setImapUser] = useState('')
   const [imapPassword, setImapPassword] = useState('')
-  const [lastChecked, setLastChecked] = useState('2025-08-01')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
@@ -26,7 +25,6 @@ export default function RegisterPage() {
         imap_host: imapHost,
         imap_user: imapUser,
         imap_password: imapPassword,
-        last_checked: lastChecked || null,
       })
       navigate('/login')
     } catch (err: any) {
@@ -98,20 +96,13 @@ export default function RegisterPage() {
               onChange={(e) => setImapPassword(e.target.value)}
               required
             />
-            <Input
-              label="Buscar emails desde"
-              type="date"
-              value={lastChecked}
-              onChange={(e) => setLastChecked(e.target.value)}
-              hint="Dejar vacío para buscar solo emails no leídos"
-            />
             {error && <StatusMessage text={error} variant="error" />}
             <Button type="submit" fullWidth loading={loading} loadingText="Registrando...">
               Registrarse
             </Button>
           </form>
           <p className="text-center text-sm text-surface-500 dark:text-surface-400 mt-4">
-            ¿Ya tenés cuenta?{' '}
+            ¿Ya tienes cuenta?{' '}
             <Link to="/login" className="text-primary-600 dark:text-primary-400 hover:underline">
               Iniciá sesión
             </Link>

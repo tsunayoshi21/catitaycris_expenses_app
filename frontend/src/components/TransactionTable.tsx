@@ -35,7 +35,7 @@ export default function TransactionTable({ transactions, total }: Props) {
   const columns = [
     columnHelper.accessor('date', {
       header: 'Fecha',
-      cell: (info) => new Date(info.getValue()).toLocaleDateString('es-CL'),
+      cell: (info) => new Date(info.getValue()).toLocaleDateString('es-CL', { timeZone: 'UTC' }),
     }),
     columnHelper.accessor('merchant', {
       header: 'Comercio',

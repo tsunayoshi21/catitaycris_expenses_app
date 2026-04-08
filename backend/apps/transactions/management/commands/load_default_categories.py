@@ -3,18 +3,20 @@ from apps.transactions.models import Category
 
 
 DEFAULT_CATEGORIES = [
-    ('comida', 'Comida y restaurantes'),
+    ('comida', 'Comida y salidas'),
     ('supermercado', 'Supermercado'),
     ('transporte', 'Transporte'),
     ('entretenimiento', 'Entretenimiento'),
     ('salud', 'Salud y farmacia'),
-    ('educacion', 'Educacion'),
+    ('educacion', 'Educación'),
     ('ropa', 'Ropa y accesorios'),
-    ('viajes', 'Viajes y alojamiento'),
+    ('viajes', 'Viajes'),
     ('servicios', 'Servicios y suscripciones'),
-    ('regalos', 'Regalos y donaciones'),
+    ('regalos', 'Regalos'),
     ('hogar', 'Hogar y equipamiento'),
-    ('tecnologia', 'Tecnologia y electronica'),
+    ('tecnologia', 'Tecnología y electrónica'),
+    ('ahorros', 'Ahorros'),
+    ('mascotas', 'Mascotas'),
     ('otros', 'Otros'),
 ]
 

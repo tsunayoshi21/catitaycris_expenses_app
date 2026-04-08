@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from django.core.management.base import BaseCommand
@@ -12,4 +13,4 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         logger.info('Iniciando email poller como management command...')
-        run_poller()
+        asyncio.run(run_poller())
