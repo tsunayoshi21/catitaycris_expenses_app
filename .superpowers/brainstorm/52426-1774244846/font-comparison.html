@@ -1,0 +1,122 @@
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Satoshi:wght@400;500;600;700&family=Geist:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=cabinet-grotesk@400,500,700&f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
+
+<style>
+  .font-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .font-card:hover {
+    border-color: rgba(99,102,241,0.4);
+    background: rgba(99,102,241,0.06);
+  }
+  .font-card.selected {
+    border-color: #6366f1;
+    background: rgba(99,102,241,0.1);
+  }
+  .font-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #818cf8;
+    margin-bottom: 12px;
+  }
+  .font-sample-heading {
+    font-size: 28px;
+    font-weight: 700;
+    color: #f1f5f9;
+    margin-bottom: 4px;
+  }
+  .font-sample-subheading {
+    font-size: 18px;
+    font-weight: 600;
+    color: #cbd5e1;
+    margin-bottom: 12px;
+  }
+  .font-sample-body {
+    font-size: 14px;
+    font-weight: 400;
+    color: #94a3b8;
+    line-height: 1.6;
+    margin-bottom: 12px;
+  }
+  .font-sample-numbers {
+    font-size: 32px;
+    font-weight: 700;
+    color: #f1f5f9;
+    letter-spacing: -0.5px;
+  }
+  .font-sample-numbers span {
+    font-size: 14px;
+    font-weight: 500;
+    color: #64748b;
+    margin-left: 4px;
+  }
+  .font-meta {
+    font-size: 12px;
+    color: #64748b;
+    margin-top: 12px;
+    font-family: system-ui;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding-top: 12px;
+  }
+
+  .f-inter { font-family: 'Inter', sans-serif; }
+  .f-satoshi { font-family: 'Satoshi', sans-serif; }
+  .f-general { font-family: 'General Sans', sans-serif; }
+  .f-manrope { font-family: 'Manrope', sans-serif; }
+</style>
+
+<h2>Elige la fuente para tu app</h2>
+<p class="subtitle">Cada opcion muestra como se veria en headings, texto y numeros de tu dashboard</p>
+
+<div class="options" style="display:block;">
+  <div class="font-card" data-choice="inter" onclick="toggleSelect(this)">
+    <div class="font-label">A &mdash; Inter</div>
+    <div class="f-inter">
+      <div class="font-sample-heading">Dashboard de Gastos</div>
+      <div class="font-sample-subheading">Resumen mensual - Marzo 2026</div>
+      <div class="font-sample-body">Transferencia bancaria recibida desde cuenta corriente. Supermercado Lider - compra con debito en sucursal Las Condes.</div>
+      <div class="font-sample-numbers">$1.284.350 <span>CLP este mes</span></div>
+    </div>
+    <div class="font-meta">Usada por Linear, Vercel, Raycast. Neutra y extremadamente legible. Tabular numbers nativos.</div>
+  </div>
+
+  <div class="font-card" data-choice="satoshi" onclick="toggleSelect(this)">
+    <div class="font-label">B &mdash; Satoshi</div>
+    <div class="f-satoshi">
+      <div class="font-sample-heading">Dashboard de Gastos</div>
+      <div class="font-sample-subheading">Resumen mensual - Marzo 2026</div>
+      <div class="font-sample-body">Transferencia bancaria recibida desde cuenta corriente. Supermercado Lider - compra con debito en sucursal Las Condes.</div>
+      <div class="font-sample-numbers">$1.284.350 <span>CLP este mes</span></div>
+    </div>
+    <div class="font-meta">Geometric moderna con personalidad. Popular en startups y apps premium. Gratis via Fontshare.</div>
+  </div>
+
+  <div class="font-card" data-choice="general-sans" onclick="toggleSelect(this)">
+    <div class="font-label">C &mdash; General Sans</div>
+    <div class="f-general">
+      <div class="font-sample-heading">Dashboard de Gastos</div>
+      <div class="font-sample-subheading">Resumen mensual - Marzo 2026</div>
+      <div class="font-sample-body">Transferencia bancaria recibida desde cuenta corriente. Supermercado Lider - compra con debito en sucursal Las Condes.</div>
+      <div class="font-sample-numbers">$1.284.350 <span>CLP este mes</span></div>
+    </div>
+    <div class="font-meta">Versatil con caracter propio. Excelente en headings grandes. Gratis via Fontshare.</div>
+  </div>
+
+  <div class="font-card" data-choice="manrope" onclick="toggleSelect(this)">
+    <div class="font-label">D &mdash; Manrope</div>
+    <div class="f-manrope">
+      <div class="font-sample-heading">Dashboard de Gastos</div>
+      <div class="font-sample-subheading">Resumen mensual - Marzo 2026</div>
+      <div class="font-sample-body">Transferencia bancaria recibida desde cuenta corriente. Supermercado Lider - compra con debito en sucursal Las Condes.</div>
+      <div class="font-sample-numbers">$1.284.350 <span>CLP este mes</span></div>
+    </div>
+    <div class="font-meta">Geometric con terminaciones suaves. Se siente premium sin ser fria. Google Fonts, gratis.</div>
+  </div>
+</div>

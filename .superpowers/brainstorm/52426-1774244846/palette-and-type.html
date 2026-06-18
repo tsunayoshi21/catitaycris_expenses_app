@@ -1,0 +1,275 @@
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+
+<style>
+  * { font-family: 'Satoshi', sans-serif; }
+
+  .section-block {
+    margin-bottom: 40px;
+  }
+  .section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #818cf8;
+    margin-bottom: 16px;
+  }
+
+  /* Typography scale */
+  .type-row {
+    display: flex;
+    align-items: baseline;
+    gap: 24px;
+    padding: 16px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .type-label {
+    width: 100px;
+    font-size: 11px;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    flex-shrink: 0;
+  }
+  .type-display { font-size: 36px; font-weight: 700; letter-spacing: -0.025em; color: #f1f5f9; }
+  .type-heading { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; color: #f1f5f9; }
+  .type-subheading { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; color: #cbd5e1; }
+  .type-body { font-size: 14px; font-weight: 400; color: #94a3b8; line-height: 1.6; }
+  .type-caption { font-size: 12px; font-weight: 500; letter-spacing: 0.01em; color: #64748b; }
+
+  /* Color palette */
+  .color-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .color-swatch {
+    border-radius: 12px;
+    padding: 20px 16px;
+    text-align: center;
+  }
+  .color-swatch .name {
+    font-size: 13px;
+    font-weight: 600;
+    color: white;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+  .color-swatch .hex {
+    font-size: 11px;
+    color: rgba(255,255,255,0.7);
+    margin-top: 4px;
+    font-family: monospace;
+  }
+
+  /* Gradient chart palette */
+  .gradient-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+  .gradient-bar {
+    height: 80px;
+    border-radius: 10px;
+    display: flex;
+    align-items: flex-end;
+    padding: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+  .gradient-bar .g-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: white;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  }
+
+  /* Surface demo */
+  .surface-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+    margin-bottom: 12px;
+  }
+  .surface-chip {
+    flex: 1;
+    padding: 16px 12px;
+    border-radius: 10px;
+    text-align: center;
+  }
+  .surface-chip .s-name {
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .surface-chip .s-hex {
+    font-size: 10px;
+    font-family: monospace;
+    opacity: 0.7;
+  }
+
+  /* Mock dashboard card */
+  .mock-dashboard {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 28px;
+    margin-top: 20px;
+  }
+  .mock-stat {
+    display: flex;
+    gap: 20px;
+  }
+  .mock-stat-card {
+    flex: 1;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .stat-label {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    color: #64748b;
+    margin-bottom: 8px;
+  }
+  .stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: #f1f5f9;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-change {
+    font-size: 12px;
+    font-weight: 500;
+    color: #34d399;
+    margin-top: 4px;
+  }
+  .stat-change.negative { color: #f87171; }
+</style>
+
+<h2>Design Tokens: Tipografia + Paleta</h2>
+<p class="subtitle">La base visual de tu app refinada</p>
+
+<!-- Typography Scale -->
+<div class="section-block">
+  <div class="section-title">Escala Tipografica — Satoshi</div>
+  <div class="type-row">
+    <div class="type-label">Display</div>
+    <div class="type-display">$1.284.350</div>
+  </div>
+  <div class="type-row">
+    <div class="type-label">Heading</div>
+    <div class="type-heading">Dashboard de Gastos</div>
+  </div>
+  <div class="type-row">
+    <div class="type-label">Subheading</div>
+    <div class="type-subheading">Resumen mensual — Marzo 2026</div>
+  </div>
+  <div class="type-row">
+    <div class="type-label">Body</div>
+    <div class="type-body">Transferencia bancaria recibida desde cuenta corriente. Supermercado Lider — compra con debito.</div>
+  </div>
+  <div class="type-row">
+    <div class="type-label">Caption</div>
+    <div class="type-caption">DEBITO &middot; 23 MAR 2026 &middot; Sin categoria</div>
+  </div>
+</div>
+
+<!-- Core Colors -->
+<div class="section-block">
+  <div class="section-title">Colores principales</div>
+  <div class="color-grid">
+    <div class="color-swatch" style="background: linear-gradient(135deg, #6d5cff, #6366f1);">
+      <div class="name">Primario</div>
+      <div class="hex">#6d5cff</div>
+    </div>
+    <div class="color-swatch" style="background: linear-gradient(135deg, #06b6d4, #0891b2);">
+      <div class="name">Accent</div>
+      <div class="hex">#06b6d4</div>
+    </div>
+    <div class="color-swatch" style="background: linear-gradient(135deg, #0a0e1a, #0f1629);">
+      <div class="name">Surface Base</div>
+      <div class="hex">#0a0e1a</div>
+    </div>
+  </div>
+</div>
+
+<!-- Surfaces Dark Mode -->
+<div class="section-block">
+  <div class="section-title">Superficies (Dark Mode)</div>
+  <div class="surface-row">
+    <div class="surface-chip" style="background: #0a0e1a; color: #94a3b8; border: 1px solid rgba(255,255,255,0.06);">
+      <div class="s-name">Base</div>
+      <div class="s-hex">#0a0e1a</div>
+    </div>
+    <div class="surface-chip" style="background: #0f1629; color: #94a3b8; border: 1px solid rgba(255,255,255,0.06);">
+      <div class="s-name">Raised</div>
+      <div class="s-hex">#0f1629</div>
+    </div>
+    <div class="surface-chip" style="background: #151d33; color: #cbd5e1; border: 1px solid rgba(255,255,255,0.08);">
+      <div class="s-name">Card</div>
+      <div class="s-hex">#151d33</div>
+    </div>
+    <div class="surface-chip" style="background: #1c2541; color: #f1f5f9; border: 1px solid rgba(255,255,255,0.10);">
+      <div class="s-name">Overlay</div>
+      <div class="s-hex">#1c2541</div>
+    </div>
+  </div>
+</div>
+
+<!-- Chart Gradients -->
+<div class="section-block">
+  <div class="section-title">Gradientes para Charts (8 categorias)</div>
+  <div class="gradient-grid">
+    <div class="gradient-bar" style="background: linear-gradient(180deg, #818cf8, #6d5cff);">
+      <div class="g-label">Indigo</div>
+    </div>
+    <div class="gradient-bar" style="background: linear-gradient(180deg, #22d3ee, #06b6d4);">
+      <div class="g-label">Cyan</div>
+    </div>
+    <div class="gradient-bar" style="background: linear-gradient(180deg, #fb7185, #e11d48);">
+      <div class="g-label">Rose</div>
+    </div>
+    <div class="gradient-bar" style="background: linear-gradient(180deg, #fbbf24, #f59e0b);">
+      <div class="g-label">Amber</div>
+    </div>
+    <div class="gradient-bar" style="background: linear-gradient(180deg, #34d399, #059669);">
+      <div class="g-label">Emerald</div>
+    </div>
+    <div class="gradient-bar" style="background: linear-gradient(180deg, #38bdf8, #0284c7);">
+      <div class="g-label">Sky</div>
+    </div>
+    <div class="gradient-bar" style="background: linear-gradient(180deg, #e879f9, #a855f7);">
+      <div class="g-label">Fuchsia</div>
+    </div>
+    <div class="gradient-bar" style="background: linear-gradient(180deg, #94a3b8, #64748b);">
+      <div class="g-label">Slate</div>
+    </div>
+  </div>
+</div>
+
+<!-- Preview: Mock Stat Cards -->
+<div class="section-block">
+  <div class="section-title">Preview — Stat Cards con nuevos tokens</div>
+  <div class="mock-dashboard">
+    <div class="mock-stat">
+      <div class="mock-stat-card">
+        <div class="stat-label">Gastos del mes</div>
+        <div class="stat-value">$842.150</div>
+        <div class="stat-change negative">+12% vs feb</div>
+      </div>
+      <div class="mock-stat-card">
+        <div class="stat-label">Ingresos del mes</div>
+        <div class="stat-value">$2.100.000</div>
+        <div class="stat-change">+0% vs feb</div>
+      </div>
+      <div class="mock-stat-card">
+        <div class="stat-label">Balance</div>
+        <div class="stat-value">$1.257.850</div>
+        <div class="stat-change">Positivo</div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,4 @@
+Asunto: {subject}
+
+Cuerpo:
+{body}
