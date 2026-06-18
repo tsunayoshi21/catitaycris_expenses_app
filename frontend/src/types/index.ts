@@ -45,6 +45,7 @@ export interface DashboardData {
   period: { start: string | null; end: string | null }
   monthly_totals: { year: number; month: number; total: string; net_total: string }[]
   by_category: { category_name: string; total: string; net_total: string }[]
+  has_estimates: boolean
 }
 
 export interface PaginatedResponse<T> {
