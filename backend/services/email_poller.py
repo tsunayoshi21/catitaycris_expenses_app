@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 from django.conf import settings
 from django.utils import timezone as dj_timezone
 from asgiref.sync import sync_to_async
+import unicodedata
 
 from apps.accounts.models import Account, SystemState
 from apps.transactions.models import Transaction, TelegramNotification, Category
@@ -16,6 +17,24 @@ from apps.users.models import CustomUser
 from .llm import parse_email as llm_parse_email, LLMServiceError, categorize
 
 logger = logging.getLogger(__name__)
+
+SUBJECT_KIND = {
+    'transferencia a terceros': 'transferencia',
+    'cargo en cuenta': 'debito',
+    'compra con tarjeta de credito': 'compra',
+    'pago de tarjeta de credito nacional': 'pago_nacional',
+    'pago de tarjeta de credito internacional': 'pago_internacional',
+}
+
+
+def _normalize_subject(s):
+    s = unicodedata.normalize('NFKD', s or '')
+    s = ''.join(c for c in s if not unicodedata.combining(c))
+    return s.strip().lower()
+
+
+def classify_subject(subject):
+    return SUBJECT_KIND.get(_normalize_subject(subject))
 
 
 class EmailProcessor:
@@ -107,12 +126,7 @@ class EmailProcessor:
         return any(sender in from_lower for sender in settings.BANK_SENDERS)
 
     def is_subject_supported(self, subject):
-        valid_subjects = [
-            'Transferencia a Terceros',
-            'Cargo en Cuenta',
-            'Compra con Tarjeta de Credito',
-        ]
-        return subject in valid_subjects
+        return classify_subject(subject) is not None
 
     def _create_email_data(self, msg, parsed_data):
         msg_dt = self._parse_email_date(msg)
