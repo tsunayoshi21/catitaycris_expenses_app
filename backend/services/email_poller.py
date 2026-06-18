@@ -138,9 +138,6 @@ class EmailProcessor:
         from_lower = email_from.lower()
         return any(sender in from_lower for sender in settings.BANK_SENDERS)
 
-    def is_subject_supported(self, subject):
-        return classify_subject(subject) is not None
-
     def _create_email_data(self, msg, parsed_data, kind, current_rate=None):
         msg_dt = self._parse_email_date(msg)
         msg_id = msg.get('Message-ID') or f'{self.account.id}:{id(msg)}'
@@ -375,10 +372,11 @@ async def poll_once():
                     except Exception as e:
                         logger.warning('Auto-categorizacion fallo para tx #%s: %s', tx.id, e)
 
-                def _create_notif(u=user, t=tx):
-                    return TelegramNotification.objects.create(user=u, transaction=t)
+                if email_data.get('type') != 'pago_tarjeta':
+                    def _create_notif(u=user, t=tx):
+                        return TelegramNotification.objects.create(user=u, transaction=t)
 
-                await sync_to_async(_create_notif)()
+                    await sync_to_async(_create_notif)()
                 logger.info('Nueva transaccion creada: tx_id=%s', tx.id)
         except Exception as e:
             logger.exception('Error procesando cuenta %s: %s', account.id, e)
