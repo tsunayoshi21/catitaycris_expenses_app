@@ -17,11 +17,14 @@ class TransactionListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
         fields = [
-            'id', 'date', 'amount', 'net_amount', 'merchant', 'type',
-            'description', 'category_name', 'category', 'split_count',
+            'id', 'date', 'amount', 'net_amount', 'currency', 'amount_clp', 'fx_status',
+            'merchant', 'type', 'description', 'category_name', 'category', 'split_count',
             'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'date', 'amount', 'merchant', 'type', 'net_amount', 'split_count', 'created_at', 'updated_at']
+        read_only_fields = [
+            'id', 'date', 'amount', 'net_amount', 'currency', 'amount_clp', 'fx_status',
+            'merchant', 'type', 'net_amount', 'split_count', 'created_at', 'updated_at',
+        ]
 
     def get_split_count(self, obj):
         return obj.splits.count()
