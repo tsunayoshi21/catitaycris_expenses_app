@@ -9,7 +9,7 @@ def _to_decimal(integer_part: str, decimals: str | None) -> Decimal:
 
 
 def parse_national_payment(body: str) -> Decimal:
-    m = re.search(r'Monto[^$]*\$\s*([\d.]+)(?:,(\d+))?', body, re.IGNORECASE)
+    m = re.search(r'Monto\s*\$\s*([\d.]+)(?:,(\d+))?', body, re.IGNORECASE)
     if not m:
         raise ValueError('No se encontro monto en pago nacional')
     return _to_decimal(m.group(1), m.group(2))
