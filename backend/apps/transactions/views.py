@@ -1,7 +1,7 @@
 import re
 
 from django.db.models import Q, Sum, Case, When, DecimalField, Value
-from django.db.models.functions import TruncMonth
+from django.db.models.functions import TruncMonth, Coalesce
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import viewsets, mixins, status
@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 
-from .models import Transaction, Category, Person, ExpenseSplit
+from .models import Transaction, Category, Person, ExpenseSplit, SETTLEMENT_TYPES
 from .serializers import (
     TransactionListSerializer, TransactionDetailSerializer,
     CategorySerializer, PersonSerializer, ExpenseSplitSerializer,
@@ -165,6 +165,9 @@ class DashboardView(APIView):
         if category_str:
             qs = qs.filter(category_name=category_str)
 
+        qs = qs.exclude(type__in=SETTLEMENT_TYPES)
+        has_estimates = qs.filter(fx_status='estimated').exists()
+
         # Monthly totals with net_total via conditional aggregate
         paid_back_sum = Sum(
             Case(
@@ -177,7 +180,7 @@ class DashboardView(APIView):
         monthly = (
             qs.annotate(month=TruncMonth('date'))
             .values('month')
-            .annotate(total=Sum('amount'), paid_back=paid_back_sum)
+            .annotate(total=Sum(Coalesce('amount_clp', 'amount')), paid_back=paid_back_sum)
             .order_by('month')
         )
 
@@ -202,7 +205,7 @@ class DashboardView(APIView):
 
         by_category = (
             qs.values('category_name')
-            .annotate(total=Sum('amount'), paid_back=by_cat_paid_back)
+            .annotate(total=Sum(Coalesce('amount_clp', 'amount')), paid_back=by_cat_paid_back)
             .order_by('-total')
         )
 
@@ -219,4 +222,5 @@ class DashboardView(APIView):
             'period': {'start': start_str, 'end': end_str},
             'monthly_totals': monthly_totals,
             'by_category': by_cat_list,
+            'has_estimates': has_estimates,
         })
