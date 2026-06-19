@@ -4,6 +4,7 @@ from django.db.models import Q, Sum
 
 TRANSACTION_TYPE_CHOICES = [
     ('debito', 'Débito'),
+    ('giro', 'Giro'),
     ('credito', 'Crédito'),
     ('transferencia', 'Transferencia'),
     ('ingreso', 'Ingreso'),
