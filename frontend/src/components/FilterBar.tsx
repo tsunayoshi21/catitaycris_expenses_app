@@ -22,6 +22,7 @@ interface Props {
 const TYPE_OPTIONS = [
   { value: '', label: 'Todos los tipos' },
   { value: 'debito', label: 'Débito' },
+  { value: 'giro', label: 'Giro' },
   { value: 'credito', label: 'Crédito' },
   { value: 'transferencia', label: 'Transferencia' },
   { value: 'ingreso', label: 'Ingreso' },

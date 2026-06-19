@@ -17,11 +17,12 @@ const TYPE_STYLES: Record<string, string> = {
   ingreso:       'bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400',
   comision:      'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
   pago_tarjeta:  'bg-surface-100 text-surface-600 dark:bg-white/[0.06] dark:text-surface-400',
+  giro:          'bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-400',
 }
 
 const TYPE_LABELS: Record<string, string> = {
   debito: 'Débito', credito: 'Crédito', transferencia: 'Transferencia',
-  ingreso: 'Ingreso', comision: 'Comisión/Cargos', pago_tarjeta: 'Pago tarjeta',
+  ingreso: 'Ingreso', comision: 'Comisión/Cargos', pago_tarjeta: 'Pago tarjeta', giro: 'Giro',
 }
 
 const columnHelper = createColumnHelper<Transaction>()

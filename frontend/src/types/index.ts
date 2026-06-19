@@ -4,7 +4,7 @@ export interface Transaction {
   amount: string
   net_amount: string
   merchant: string | null
-  type: 'debito' | 'credito' | 'transferencia' | 'ingreso' | 'comision' | 'pago_tarjeta' | 'desconocido'
+  type: 'debito' | 'credito' | 'transferencia' | 'ingreso' | 'comision' | 'pago_tarjeta' | 'giro' | 'desconocido'
   currency: 'CLP' | 'USD'
   amount_clp: string | null
   fx_status: 'na' | 'estimated' | 'final'
