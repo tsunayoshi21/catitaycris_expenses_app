@@ -19,6 +19,17 @@ from services.llm import categorize
 logger = logging.getLogger(__name__)
 
 
+def format_amount(currency, amount, amount_clp, fx_status):
+    """Formatea el monto para notificaciones: USD con 2 decimales + equivalente CLP; CLP entero."""
+    if currency == 'USD':
+        s = f'US${amount:,.2f}'
+        if amount_clp is not None:
+            prefix = '≈ ' if fx_status == 'estimated' else ''
+            s += f' ({prefix}${amount_clp:,.0f} CLP)'
+        return s
+    return f'${amount:,.0f} CLP'
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     logger.info('Comando /start recibido de chat_id=%s', chat_id)
@@ -243,7 +254,7 @@ async def process_notification_outbox(application):
                     msg = (
                         f'💳 Nueva transaccion detectada (#{tx.id}):\n\n'
                         f'📅 Fecha: {tx.date.strftime("%d/%m/%Y %H:%M")}\n'
-                        f'💰 Monto: ${tx.amount:,.0f}\n'
+                        f'💰 Monto: {format_amount(tx.currency, tx.amount, tx.amount_clp, tx.fx_status)}\n'
                         f'🏪 Comercio: {tx.merchant or "No especificado"}\n'
                         f'🔄 Tipo: {tx.type}\n'
                         f'📁 Categoria sugerida: {tx.category_name or "sin categoria"}\n\n'
