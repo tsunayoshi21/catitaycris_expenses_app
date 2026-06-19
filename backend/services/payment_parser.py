@@ -15,6 +15,13 @@ def parse_national_payment(body: str) -> Decimal:
     return _to_decimal(m.group(1), m.group(2))
 
 
+def parse_giro(body: str) -> Decimal:
+    m = re.search(r'por\s*\$\s*([\d.]+)(?:,(\d+))?', body, re.IGNORECASE)
+    if not m:
+        raise ValueError('No se encontro monto en giro')
+    return _to_decimal(m.group(1), m.group(2))
+
+
 def parse_international_payment(body: str) -> tuple[Decimal, Decimal]:
     usd_m = re.search(r'Monto pagado\s*USD\$\s*([\d.]+)(?:,(\d+))?', body, re.IGNORECASE)
     # CLP total: "Monto $..." que NO sea "Monto pagado"

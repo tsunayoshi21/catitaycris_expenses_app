@@ -16,7 +16,7 @@ from apps.accounts.models import Account, SystemState
 from apps.transactions.models import Transaction, TelegramNotification, Category
 from apps.users.models import CustomUser
 from .llm import parse_email as llm_parse_email, LLMServiceError, categorize
-from .payment_parser import parse_national_payment, parse_international_payment
+from .payment_parser import parse_national_payment, parse_international_payment, parse_giro
 from .reconciliation import reconcile_national_payment, reconcile_international_payment
 from .fx import fetch_usd_clp
 
@@ -28,6 +28,7 @@ SUBJECT_KIND = {
     'compra con tarjeta de credito': 'compra',
     'pago de tarjeta de credito nacional': 'pago_nacional',
     'pago de tarjeta de credito internacional': 'pago_internacional',
+    'giro con tarjeta de debito': 'giro',
 }
 
 
@@ -187,6 +188,24 @@ class EmailProcessor:
             data['clp_total'] = clp_total
         return data
 
+    def _create_giro_data(self, msg, body):
+        msg_dt = self._parse_email_date(msg)
+        msg_id = msg.get('Message-ID') or f'{self.account.id}:{id(msg)}'
+        date_val = msg_dt or datetime.now(timezone.utc)
+        monto = parse_giro(body)
+        return {
+            'kind': 'giro',
+            'email_id': msg_id,
+            'date': date_val,
+            'merchant': None,
+            'type': 'giro',
+            'currency': 'CLP',
+            'fx_status': 'na',
+            'amount': monto,
+            'amount_clp': monto,
+            'email_date': msg_dt,
+        }
+
     async def process_emails(self, current_rate=None):
         logger.info('Conectando a IMAP %s para cuenta %s', self.account.imap_host, self.account.id)
         conn = imaplib.IMAP4_SSL(self.account.imap_host, settings.IMAP_PORT)
@@ -267,6 +286,8 @@ class EmailProcessor:
                 await sync_to_async(_pause_polling_on_llm_error)(str(e))
                 raise
             return self._create_email_data(msg, parsed_data, kind, current_rate)
+        if kind == 'giro':
+            return self._create_giro_data(msg, body)
         # pagos: pago_nacional / pago_internacional
         return self._create_payment_data(msg, body, kind)
 

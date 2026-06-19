@@ -21,3 +21,7 @@ def test_existentes():
 
 def test_no_soportado():
     assert classify_subject('Newsletter mensual') is None
+
+
+def test_giro_con_tilde():
+    assert classify_subject('Giro con Tarjeta de Débito') == 'giro'
