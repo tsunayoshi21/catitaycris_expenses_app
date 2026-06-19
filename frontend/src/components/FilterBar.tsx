@@ -22,9 +22,12 @@ interface Props {
 const TYPE_OPTIONS = [
   { value: '', label: 'Todos los tipos' },
   { value: 'debito', label: 'Débito' },
+  { value: 'giro', label: 'Giro' },
   { value: 'credito', label: 'Crédito' },
   { value: 'transferencia', label: 'Transferencia' },
   { value: 'ingreso', label: 'Ingreso' },
+  { value: 'comision', label: 'Comisión/Cargos' },
+  { value: 'pago_tarjeta', label: 'Pago tarjeta' },
 ]
 
 export default function FilterBar({ filters, onChange }: Props) {

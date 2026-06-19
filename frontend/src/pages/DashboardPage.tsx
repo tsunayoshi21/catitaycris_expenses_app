@@ -8,6 +8,7 @@ import type { Filters } from '../components/FilterBar'
 import { categoryColor, formatCLP } from '../utils/categoryColors'
 import { Card } from '../components/ui'
 import PageLayout from '../components/PageLayout'
+import EstimatesBanner from '../components/EstimatesBanner'
 
 export default function DashboardPage() {
   const now = new Date()
@@ -43,6 +44,8 @@ export default function DashboardPage() {
       <div className="mb-6">
         <FilterBar filters={filters} onChange={setFilters} />
       </div>
+
+      <EstimatesBanner show={!!data?.has_estimates} />
 
       {isLoading && <p className="text-surface-500 dark:text-surface-400">Cargando...</p>}
 

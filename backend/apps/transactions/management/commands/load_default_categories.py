@@ -18,6 +18,7 @@ DEFAULT_CATEGORIES = [
     ('ahorros', 'Ahorros'),
     ('mascotas', 'Mascotas'),
     ('otros', 'Otros'),
+    ('comisiones', 'Comisiones/Cargos'),
 ]
 
 

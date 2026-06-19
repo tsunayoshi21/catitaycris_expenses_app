@@ -4,7 +4,10 @@ export interface Transaction {
   amount: string
   net_amount: string
   merchant: string | null
-  type: 'debito' | 'credito' | 'transferencia' | 'ingreso' | 'desconocido'
+  type: 'debito' | 'credito' | 'transferencia' | 'ingreso' | 'comision' | 'pago_tarjeta' | 'giro' | 'desconocido'
+  currency: 'CLP' | 'USD'
+  amount_clp: string | null
+  fx_status: 'na' | 'estimated' | 'final'
   description: string | null
   category_name: string | null
   category: number | null
@@ -42,6 +45,7 @@ export interface DashboardData {
   period: { start: string | null; end: string | null }
   monthly_totals: { year: number; month: number; total: string; net_total: string }[]
   by_category: { category_name: string; total: string; net_total: string }[]
+  has_estimates: boolean
 }
 
 export interface PaginatedResponse<T> {

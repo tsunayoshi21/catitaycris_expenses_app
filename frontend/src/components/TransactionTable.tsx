@@ -15,11 +15,14 @@ const TYPE_STYLES: Record<string, string> = {
   credito:       'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400',
   transferencia: 'bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400',
   ingreso:       'bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400',
+  comision:      'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
+  pago_tarjeta:  'bg-surface-100 text-surface-600 dark:bg-white/[0.06] dark:text-surface-400',
+  giro:          'bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-400',
 }
 
 const TYPE_LABELS: Record<string, string> = {
   debito: 'Débito', credito: 'Crédito', transferencia: 'Transferencia',
-  ingreso: 'Ingreso',
+  ingreso: 'Ingreso', comision: 'Comisión/Cargos', pago_tarjeta: 'Pago tarjeta', giro: 'Giro',
 }
 
 const columnHelper = createColumnHelper<Transaction>()
@@ -44,11 +47,20 @@ export default function TransactionTable({ transactions, total }: Props) {
     columnHelper.accessor('amount', {
       header: 'Monto',
       cell: (info) => {
-        const type = info.row.original.type
-        const isPositive = type === 'ingreso' || type === 'credito'
+        const row = info.row.original
+        const isPositive = row.type === 'ingreso'
+        const native = row.currency === 'USD'
+          ? `US$${parseFloat(info.getValue()).toFixed(2)}`
+          : formatCLP(parseFloat(info.getValue()))
+        const clp = row.amount_clp ? formatCLP(parseFloat(row.amount_clp)) : '—'
         return (
           <span className={isPositive ? 'text-green-600 dark:text-green-400' : ''}>
-            {formatCLP(parseFloat(info.getValue()))}
+            {native}
+            {row.currency === 'USD' && (
+              <span className="ml-1 text-xs text-surface-500">
+                ({row.fx_status === 'estimated' ? '≈ ' : ''}{clp})
+              </span>
+            )}
           </span>
         )
       },
@@ -57,7 +69,7 @@ export default function TransactionTable({ transactions, total }: Props) {
       header: 'Neto',
       cell: (info) => {
         const type = info.row.original.type
-        const isPositive = type === 'ingreso' || type === 'credito'
+        const isPositive = type === 'ingreso'
         return (
           <span className={isPositive ? 'text-green-600 dark:text-green-400' : ''}>
             {formatCLP(parseFloat(info.getValue()))}

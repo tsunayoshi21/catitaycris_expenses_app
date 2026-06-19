@@ -4,11 +4,19 @@ from django.db.models import Q, Sum
 
 TRANSACTION_TYPE_CHOICES = [
     ('debito', 'Débito'),
+    ('giro', 'Giro'),
     ('credito', 'Crédito'),
     ('transferencia', 'Transferencia'),
     ('ingreso', 'Ingreso'),
+    ('comision', 'Comisión/Cargos'),
+    ('pago_tarjeta', 'Pago tarjeta'),
     ('desconocido', 'Desconocido'),
 ]
+
+CURRENCY_CHOICES = [('CLP', 'CLP'), ('USD', 'USD')]
+FX_STATUS_CHOICES = [('na', 'N/A'), ('estimated', 'Estimado'), ('final', 'Final')]
+
+SETTLEMENT_TYPES = frozenset({'pago_tarjeta'})
 
 
 class Category(models.Model):
@@ -57,6 +65,13 @@ class Transaction(models.Model):
     amount = models.DecimalField(max_digits=14, decimal_places=2)
     merchant = models.CharField(max_length=255, null=True, blank=True)
     type = models.CharField(max_length=20, choices=TRANSACTION_TYPE_CHOICES, default='desconocido')
+    currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default='CLP')
+    amount_clp = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    fx_status = models.CharField(max_length=10, choices=FX_STATUS_CHOICES, default='na')
+    fx_rate = models.DecimalField(max_digits=14, decimal_places=4, null=True, blank=True)
+    settled_by = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='settles'
+    )
     description = models.TextField(null=True, blank=True)
     category_name = models.CharField(max_length=100, null=True, blank=True)
     category = models.ForeignKey(
@@ -78,8 +93,9 @@ class Transaction(models.Model):
 
     @property
     def net_amount(self):
+        base = self.amount_clp if self.amount_clp is not None else self.amount
         paid_back = self.splits.filter(paid_back=True).aggregate(total=Sum('amount'))['total'] or 0
-        return self.amount - paid_back
+        return base - paid_back
 
     def __str__(self):
         return f"{self.date:%Y-%m-%d} {self.merchant or ''} ${self.amount}"
