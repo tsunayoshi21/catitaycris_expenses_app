@@ -1,6 +1,6 @@
 import { Doughnut } from 'react-chartjs-2'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
-import { categoryColor } from '../utils/categoryColors'
+import { categoryColor, formatCLP } from '../utils/categoryColors'
 import { useChartTheme } from '../hooks/useChartTheme'
 
 ChartJS.register(ArcElement, Tooltip, Legend)
@@ -45,6 +45,15 @@ export default function CategoryDoughnut({ data, selectedCategories }: Props) {
             bodyColor: ct.tooltipText,
             borderColor: ct.tooltipBorder,
             borderWidth: 1,
+            callbacks: {
+              label: (ctx) => {
+                const value = ctx.parsed
+                const dataset = ctx.dataset.data as number[]
+                const sum = dataset.reduce((acc, v) => acc + (v || 0), 0)
+                const pct = sum > 0 ? (value / sum) * 100 : 0
+                return `${formatCLP(value)} (${pct.toFixed(1)}%)`
+              },
+            },
           },
         },
       }}
