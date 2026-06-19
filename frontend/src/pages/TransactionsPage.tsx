@@ -4,6 +4,7 @@ import TransactionTable from '../components/TransactionTable'
 import FilterBar from '../components/FilterBar'
 import type { Filters } from '../components/FilterBar'
 import PageLayout from '../components/PageLayout'
+import EstimatesBanner from '../components/EstimatesBanner'
 
 export default function TransactionsPage() {
   const now = new Date()
@@ -25,6 +26,7 @@ export default function TransactionsPage() {
       <div className="mb-6">
         <FilterBar filters={filters} onChange={setFilters} />
       </div>
+      <EstimatesBanner show={!!data?.results.some((t) => t.fx_status === 'estimated')} />
       {isLoading && <p className="text-surface-500 dark:text-surface-400">Cargando...</p>}
       {data && data.results.length > 0 && (
         <TransactionTable transactions={data.results} total={data.count} />
